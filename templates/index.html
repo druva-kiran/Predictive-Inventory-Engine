@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    <meta name="theme-color" content="#f5f4f0" id="theme-color-meta">
+    <title>Inventory Forecast</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        /* ── Light theme (default) ── */
+        :root {
+            --bg: #f5f4f0;
+            --surface: #ffffff;
+            --surface-hover: #f7f6f2;
+            --border: #e8e6e0;
+            --text-primary: #1a1a18;
+            --text-secondary: #8a8880;
+            --accent: #1a1a18;
+            --accent-light: #f0efe9;
+            --green: #2d6a4f;
+            --green-light: #edf5f0;
+            --green-border: #c3ddd0;
+            --red: #c0392b;
+            --red-light: #fdf0ee;
+            --yellow: #b7791f;
+            --yellow-light: #fef9ed;
+            --chart-bar: #1a1a18;
+            --chart-grid: #f0efe9;
+            --chart-tick: #8a8880;
+            --chart-border: #e8e6e0;
+            --tooltip-bg: #ffffff;
+            --tooltip-title: #1a1a18;
+            --tooltip-body: #8a8880;
+            --tooltip-border: #e8e6e0;
+            --mono: 'DM Mono', monospace;
+            --sans: 'DM Sans', sans-serif;
+            --radius: 14px;
+            --radius-sm: 9px;
+            --touch: 44px;
+            --shadow: 0 2px 12px rgba(0,0,0,0.06);
+            --shadow-hover: 0 6px 24px rgba(0,0,0,0.10);
+        }
+
+        /* ── Dark theme ── */
+        [data-theme="dark"] {
+            --bg: #0f1117;
+            --surface: #1a1d24;
+            --surface-hover: #21252e;
+            --border: #2a2d36;
+            --text-primary: #e8e6e0;
+            --text-secondary: #6b6d75;
+            --accent: #e8e6e0;
+            --accent-light: #21252e;
+            --green: #4ade80;
+            --green-light: #0d2318;
+            --green-border: #1a4030;
+            --red: #f87171;
+            --red-light: #2a1010;
+            --yellow: #fbbf24;
+            --yellow-light: #2a1f08;
+            --chart-bar: #e8e6e0;
+            --chart-grid: #1e2129;
+            --chart-tick: #6b6d75;
+            --chart-border: #2a2d36;
+            --tooltip-bg: #1a1d24;
+            --tooltip-title: #e8e6e0;
+            --tooltip-body: #6b6d75;
+            --tooltip-border: #2a2d36;
+            --shadow: 0 2px 12px rgba(0,0,0,0.3);
+            --shadow-hover: 0 6px 24px rgba(0,0,0,0.5);
+        }
+
+        html { -webkit-text-size-adjust: 100%; }
+        body {
+            font-family: var(--sans);
+            background: var(--bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 16px 16px 48px;
+            transition: background 0.25s, color 0.25s;
+        }
+        .wrapper { max-width: 1160px; margin: 0 auto; }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse  { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+        /* ── Header ── */
+        header {
+            display: flex; flex-direction: column; gap: 12px;
+            margin-bottom: 20px; padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+            animation: fadeUp 0.4s ease both;
+        }
+        .header-top { display: flex; justify-content: space-between; align-items: center; }
+        .header-left h1 { font-size: 1.35rem; font-weight: 500; letter-spacing: -0.03em; }
+        .header-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+
+        /* ── Dark mode toggle ── */
+        .theme-toggle {
+            width: var(--touch); height: var(--touch);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border);
+            background: var(--surface);
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.1rem;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s;
+            flex-shrink: 0;
+        }
+        .theme-toggle:hover { background: var(--accent-light); border-color: var(--text-secondary); transform: scale(1.05); }
+        .theme-toggle:active { transform: scale(0.95); }
+
+        .store-select {
+            font-family: var(--mono); font-size: 0.78rem;
+            color: var(--text-primary); background: var(--surface);
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            height: var(--touch); padding: 0 32px 0 12px;
+            outline: none; cursor: pointer; flex: 1; max-width: 160px;
+            -webkit-appearance: none; appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238a8880' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center;
+            transition: background-color 0.25s, border-color 0.25s, color 0.25s;
+        }
+
+        .status-pill {
+            display: flex; align-items: center; gap: 7px;
+            font-family: var(--mono); font-size: 0.7rem;
+            color: var(--green); background: var(--green-light);
+            height: var(--touch); padding: 0 14px;
+            border-radius: 100px; border: 1px solid var(--green-border);
+            white-space: nowrap; transition: all 0.25s;
+        }
+        .status-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; flex-shrink: 0; animation: pulse 2s infinite; }
+
+        /* ── Tabs ── */
+        .tabs-wrap {
+            position: relative; margin-bottom: 16px;
+            animation: fadeUp 0.4s 0.05s ease both;
+        }
+        .tabs-wrap::after {
+            content: ''; position: absolute;
+            right: 0; top: 0; bottom: 0; width: 28px;
+            background: linear-gradient(to right, transparent, var(--bg));
+            pointer-events: none; transition: background 0.25s;
+        }
+        .tabs { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 2px; -ms-overflow-style: none; scrollbar-width: none; }
+        .tabs::-webkit-scrollbar { display: none; }
+        .tab {
+            font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.06em;
+            height: var(--touch); padding: 0 16px;
+            border-radius: var(--radius-sm); border: 1px solid transparent;
+            cursor: pointer; color: var(--text-secondary); background: transparent;
+            transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+        }
+        .tab:hover  { color: var(--text-primary); background: var(--surface); }
+        .tab.active { color: var(--text-primary); background: var(--surface); border-color: var(--border); }
+
+        /* ── Panels ── */
+        .panel { display: none; }
+        .panel.active { display: block; }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 18px; margin-bottom: 12px;
+            transition: background 0.25s, border-color 0.25s;
+        }
+        .card-label {
+            font-family: var(--mono); font-size: 0.67rem; letter-spacing: 0.1em;
+            text-transform: uppercase; color: var(--text-secondary); margin-bottom: 16px;
+        }
+
+        /* ── Buttons ── */
+        .btn-primary, .btn-secondary {
+            width: 100%; height: var(--touch); border-radius: var(--radius-sm);
+            font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em;
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: opacity 0.2s, border-color 0.2s, color 0.2s, background 0.2s;
+        }
+        .btn-primary  { background: var(--accent); color: var(--bg); border: none; margin-bottom: 10px; }
+        .btn-primary:hover  { opacity: 0.8; }
+        .btn-primary:active { opacity: 0.65; }
+        .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+        .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); }
+        .btn-secondary:hover  { border-color: var(--accent); color: var(--text-primary); }
+        .btn-secondary:active { opacity: 0.7; }
+
+        .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+        .search-input {
+            width: 100%; height: var(--touch); padding: 0 14px;
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); font-family: var(--mono);
+            font-size: max(0.82rem, 16px); color: var(--text-primary);
+            outline: none; transition: border-color 0.2s, background 0.25s, color 0.25s;
+        }
+        .search-input::placeholder { color: var(--text-secondary); }
+        .search-input:focus { border-color: var(--accent); }
+
+        /* ── Chart ── */
+        .chart-meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 12px; }
+        .chart-stat { text-align: right; flex-shrink: 0; }
+        .chart-stat .big-num { font-size: 1.4rem; font-weight: 500; letter-spacing: -0.04em; line-height: 1; }
+        .chart-stat .sub { font-family: var(--mono); font-size: 0.66rem; color: var(--text-secondary); margin-top: 3px; }
+        .chart-wrap { position: relative; width: 100%; height: 220px; }
+
+        /* ── Stat Row ── */
+        .stat-row {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 10px; margin-bottom: 12px;
+            animation: fadeUp 0.4s 0.1s ease both;
+        }
+        .stat-card {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 14px 16px;
+            transition: background 0.25s, border-color 0.25s;
+        }
+        .stat-card .label { font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-secondary); margin-bottom: 6px; }
+        .stat-card .value { font-size: 1.3rem; font-weight: 500; letter-spacing: -0.03em; line-height: 1; }
+        .stat-card .value.good { color: var(--green); }
+        .stat-card .value.warn { color: var(--yellow); }
+
+        /* ── Tables ── */
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+        .table-count  { font-family: var(--mono); font-size: 0.7rem; color: var(--text-secondary); }
+        .table-scroll { overflow-x: auto; overflow-y: auto; max-height: 400px; -webkit-overflow-scrolling: touch; }
+        table { width: 100%; border-collapse: collapse; min-width: 320px; }
+        thead th {
+            font-family: var(--mono); font-size: 0.65rem; letter-spacing: 0.08em;
+            text-transform: uppercase; color: var(--text-secondary);
+            padding: 0 14px 10px 0; text-align: left;
+            border-bottom: 1px solid var(--border);
+            position: sticky; top: 0; background: var(--surface); z-index: 1;
+            white-space: nowrap; transition: background 0.25s;
+        }
+        tbody tr { transition: background 0.12s; }
+        tbody tr:hover td { background: var(--accent-light); }
+        td { padding: 13px 14px 13px 0; font-size: 0.875rem; border-bottom: 1px solid var(--border); white-space: nowrap; transition: background 0.12s; }
+        td:first-child { font-weight: 500; white-space: normal; min-width: 110px; }
+
+        .mono-val { font-family: var(--mono); font-size: 0.8rem; }
+        .badge {
+            display: inline-flex; align-items: center; gap: 5px;
+            font-family: var(--mono); font-size: 0.67rem;
+            padding: 4px 10px; border-radius: 100px;
+        }
+        .badge-green  { color: var(--green);  background: var(--green-light); }
+        .badge-red    { color: var(--red);    background: var(--red-light); }
+        .badge-yellow { color: var(--yellow); background: var(--yellow-light); }
+
+        /* ── Metric Cards ── */
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 10px; animation: fadeUp 0.4s ease both;
+        }
+        .metric-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px;
+            min-height: 90px;
+            cursor: default;
+            /* Smooth lift on hover */
+            transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+            box-shadow: var(--shadow);
+        }
+        .metric-card:hover {
+            background: var(--surface-hover);
+            border-color: var(--text-secondary);
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+        .metric-card .cat-name {
+            font-size: 0.82rem; font-weight: 500; margin-bottom: 10px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .metric-row { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
+        .metric-row .mlabel { font-family: var(--mono); font-size: 0.63rem; color: var(--text-secondary); }
+        .metric-row .mval   { font-family: var(--mono); font-size: 0.78rem; font-weight: 500; }
+
+        /* ── Replenishment controls ── */
+        .rep-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .rep-controls .store-select { max-width: 120px; font-size: 0.72rem; }
+        .btn-inline {
+            height: var(--touch); padding: 0 16px; width: auto;
+            border-radius: var(--radius-sm); font-family: var(--mono);
+            font-size: 0.72rem; letter-spacing: 0.06em; cursor: pointer;
+            background: transparent; color: var(--text-secondary);
+            border: 1px solid var(--border);
+            transition: all 0.2s; white-space: nowrap;
+            display: flex; align-items: center;
+        }
+        .btn-inline:hover { border-color: var(--accent); color: var(--text-primary); }
+
+        /* ── Empty / Loading ── */
+        .empty-state { text-align: center; padding: 48px 20px; color: var(--text-secondary); font-family: var(--mono); font-size: 0.78rem; }
+        .empty-state .icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.22; display: block; }
+        .loading { text-align: center; padding: 36px; font-family: var(--mono); font-size: 0.76rem; color: var(--text-secondary); }
+
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+        /* ══ Tablet ≥640px ══ */
+        @media (min-width: 640px) {
+            body { padding: 28px 28px 56px; }
+            header { flex-direction: row; align-items: center; gap: 16px; }
+            .header-top { flex: 1; }
+            .header-bottom { justify-content: flex-end; flex: 0; }
+            .header-left h1 { font-size: 1.5rem; }
+            .card { padding: 22px; }
+            .chart-wrap { height: 260px; }
+            .metrics-grid { grid-template-columns: repeat(3, 1fr); }
+            .search-input { font-size: 0.82rem; }
+        }
+
+        /* ══ Desktop ≥900px ══ */
+        @media (min-width: 900px) {
+            body { padding: 40px 40px 64px; }
+            .header-left h1 { font-size: 1.6rem; }
+            .forecast-grid {
+                display: grid; grid-template-columns: 260px 1fr;
+                gap: 16px; margin-bottom: 12px; align-items: start;
+            }
+            .forecast-grid .card { margin-bottom: 0; }
+            .chart-wrap { height: 300px; }
+            .stat-card { padding: 18px 20px; }
+            .stat-card .value { font-size: 1.4rem; }
+            .metrics-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+            .metric-card { padding: 16px 18px; }
+            .table-scroll { max-height: 440px; }
+        }
+
+        @media (min-width: 1100px) {
+            .metrics-grid { grid-template-columns: repeat(5, 1fr); }
+        }
+    </style>
+</head>
+<body>
+<div class="wrapper">
+
+    <!-- ── Header ── -->
+    <header>
+        <div class="header-top">
+            <div class="header-left"><h1>Inventory Forecast</h1></div>
+        </div>
+        <div class="header-bottom">
+            <select class="store-select" id="store-select" onchange="onStoreChange()">
+                <option value="1">Store 1</option>
+            </select>
+            <div class="status-pill">
+                <span class="status-dot"></span>
+                <span id="device-label">CUDA ACTIVE</span>
+            </div>
+            <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">🌙</button>
+        </div>
+    </header>
+
+    <!-- ── Tabs ── -->
+    <div class="tabs-wrap">
+        <div class="tabs" role="tablist">
+            <button class="tab active" id="tab-forecast"       role="tab" onclick="switchTab('forecast', this)">FORECAST</button>
+            <button class="tab"        id="tab-replenishment"  role="tab" onclick="switchTab('replenishment', this)">REPLENISHMENT</button>
+            <button class="tab"        id="tab-metrics"        role="tab" onclick="switchTab('metrics', this)">METRICS</button>
+        </div>
+    </div>
+
+    <!-- ════════ FORECAST ════════ -->
+    <div class="panel active" id="panel-forecast">
+        <div class="forecast-grid">
+            <div class="card">
+                <div class="card-label">Engine</div>
+                <button class="btn-primary" id="run-btn" onclick="runInference()">RUN INFERENCE</button>
+                <!-- Fixed: directly calls switchTab with the correct tab element -->
+                <button class="btn-secondary" onclick="switchTab('metrics', document.getElementById('tab-metrics'))">VIEW METRICS</button>
+                <hr class="divider">
+                <div class="card-label">Filter</div>
+                <input type="text" id="search-input" class="search-input" placeholder="e.g. MEATS, DAIRY…" onkeyup="filterTable()">
+            </div>
+            <div class="card">
+                <div class="chart-meta">
+                    <div class="card-label" style="margin-bottom:0">Demand · Next 24h</div>
+                    <div class="chart-stat">
+                        <div class="big-num" id="total-val">—</div>
+                        <div class="sub">projected units</div>
+                    </div>
+                </div>
+                <div class="chart-wrap"><canvas id="mainChart"></canvas></div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+            <div class="table-header">
+                <div class="card-label" style="margin-bottom:0">Category Breakdown</div>
+                <div class="table-count" id="row-count"></div>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead><tr><th>Family Group</th><th>Predicted Sales</th><th>Confidence</th></tr></thead>
+                    <tbody id="table-body">
+                        <tr><td colspan="3"><div class="empty-state"><span class="icon">◌</span>Run inference to load predictions</div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════ REPLENISHMENT ════════ -->
+    <div class="panel" id="panel-replenishment">
+        <div class="stat-row">
+            <div class="stat-card"><div class="label">Orders Needed</div><div class="value warn" id="rep-orders-count">—</div></div>
+            <div class="stat-card"><div class="label">Lead Time</div><div class="value" id="rep-lead-time">3 days</div></div>
+            <div class="stat-card"><div class="label">Service Level</div><div class="value good">95%</div></div>
+        </div>
+        <div class="card" style="margin-bottom:0">
+            <div class="table-header">
+                <div class="card-label" style="margin-bottom:0">Recommendations</div>
+                <div class="rep-controls">
+                    <select class="store-select" id="lead-select" onchange="loadReplenishment()">
+                        <option value="1">Lead: 1d</option>
+                        <option value="3" selected>Lead: 3d</option>
+                        <option value="7">Lead: 7d</option>
+                    </select>
+                    <button class="btn-inline" onclick="loadReplenishment()">REFRESH</button>
+                </div>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead><tr><th>Category</th><th>Forecast</th><th>Safety Stock</th><th>Reorder Pt.</th><th>Rec. Order</th><th>Action</th></tr></thead>
+                    <tbody id="rep-table-body">
+                        <tr><td colspan="6"><div class="empty-state"><span class="icon">◌</span>Switch to this tab to load data</div></td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════ METRICS ════════ -->
+    <div class="panel" id="panel-metrics">
+        <div class="stat-row">
+            <div class="stat-card"><div class="label">Mean MAPE</div><div class="value" id="mean-mape">—</div></div>
+            <div class="stat-card"><div class="label">Mean RMSE</div><div class="value" id="mean-rmse">—</div></div>
+            <div class="stat-card"><div class="label">Test Split</div><div class="value">20%</div></div>
+        </div>
+        <div id="metrics-grid" class="metrics-grid">
+            <div class="empty-state" style="grid-column:1/-1"><span class="icon">◌</span>Switch to this tab to load metrics</div>
+        </div>
+    </div>
+
+</div>
+<script>
+    let masterData    = {};
+    let chart;
+    let currentStore  = 1;
+    let metricsLoaded = false;
+    let repLoaded     = false;
+    let darkMode      = false;
+
+    /* ── Dark mode ── */
+    function toggleTheme() {
+        darkMode = !darkMode;
+        document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+        document.getElementById('theme-toggle').textContent = darkMode ? '☀️' : '🌙';
+        document.getElementById('theme-color-meta').setAttribute('content', darkMode ? '#0f1117' : '#f5f4f0');
+        // Rebuild chart with new colors if data exists
+        const l = Object.keys(masterData), v = Object.values(masterData);
+        if (l.length) buildChart(l.slice(0, 10), v.slice(0, 10));
+    }
+
+    /* ── Startup ── */
+    window.addEventListener('load', async () => {
+        try {
+            const data = await fetch('/status').then(r => r.json());
+            const sel  = document.getElementById('store-select');
+            sel.innerHTML = '';
+            data.stores_cached.forEach(s => {
+                const o = document.createElement('option');
+                o.value = s; o.textContent = `Store ${s}`;
+                if (s === 1) o.selected = true;
+                sel.appendChild(o);
+            });
+            document.getElementById('device-label').textContent =
+                data.device.startsWith('cuda') ? 'CUDA ACTIVE' : 'CPU MODE';
+        } catch (_) {}
+    });
+
+    /* ── Store change ── */
+    function onStoreChange() {
+        currentStore = parseInt(document.getElementById('store-select').value);
+        metricsLoaded = repLoaded = false;
+        masterData = {};
+        if (chart) { chart.destroy(); chart = null; }
+        document.getElementById('total-val').textContent = '—';
+        document.getElementById('row-count').textContent = '';
+        document.getElementById('mean-mape').textContent = '—';
+        document.getElementById('mean-rmse').textContent = '—';
+        document.getElementById('rep-orders-count').textContent = '—';
+        document.getElementById('table-body').innerHTML =
+            '<tr><td colspan="3"><div class="empty-state"><span class="icon">◌</span>Run inference to load predictions</div></td></tr>';
+        document.getElementById('rep-table-body').innerHTML =
+            '<tr><td colspan="6"><div class="empty-state"><span class="icon">◌</span>Click Refresh to reload</div></td></tr>';
+        document.getElementById('metrics-grid').innerHTML =
+            '<div class="empty-state" style="grid-column:1/-1"><span class="icon">◌</span>Switch to this tab to load metrics</div>';
+    }
+
+    /* ── Tabs ── */
+    function switchTab(name, btn) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('panel-' + name).classList.add('active');
+        btn.classList.add('active');
+        if (name === 'replenishment' && !repLoaded) loadReplenishment();
+        if (name === 'metrics'       && !metricsLoaded) loadMetrics();
+    }
+
+    /* ── Forecast ── */
+    async function runInference() {
+        const btn = document.getElementById('run-btn');
+        btn.textContent = 'COMPUTING…';
+        btn.disabled = true;
+        try {
+            const json = await fetch(`/predict/all?store=${currentStore}`).then(r => r.json());
+            if (json.error) { alert(json.error); return; }
+            masterData = json.predictions;
+            renderForecast();
+        } catch {
+            alert('API connection failed. Is Flask running on port 5000?');
+        } finally {
+            btn.textContent = 'RUN INFERENCE';
+            btn.disabled = false;
+        }
+    }
+
+    function renderForecast() {
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+        const labels = Object.keys(masterData);
+        const values = Object.values(masterData);
+        const total  = values.reduce((a, b) => a + b, 0);
+        document.getElementById('total-val').textContent = Math.round(total).toLocaleString();
+        document.getElementById('row-count').textContent = labels.length + ' categories';
+        labels.forEach(cat => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${cat}</td>
+                <td><span class="mono-val">${masterData[cat].toLocaleString()}</span></td>
+                <td><span class="badge badge-green">● High</span></td>`;
+            tbody.appendChild(tr);
+        });
+        buildChart(labels.slice(0, 10), values.slice(0, 10));
+    }
+
+    function filterTable() {
+        const q    = document.getElementById('search-input').value.toUpperCase();
+        const rows = document.getElementById('table-body').getElementsByTagName('tr');
+        let vis = 0;
+        for (const r of rows) { const s = r.innerText.toUpperCase().includes(q); r.style.display = s ? '' : 'none'; if (s) vis++; }
+        const k = Object.keys(masterData);
+        if (k.length) document.getElementById('row-count').textContent = vis + ' / ' + k.length + ' categories';
+    }
+
+    function getComputedVar(name) {
+        return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+
+    function buildChart(labels, values) {
+        if (chart) chart.destroy();
+        const mobile = window.innerWidth < 640;
+        const barColor    = getComputedVar('--chart-bar');
+        const gridColor   = getComputedVar('--chart-grid');
+        const tickColor   = getComputedVar('--chart-tick');
+        const borderColor = getComputedVar('--chart-border');
+        const ttBg        = getComputedVar('--tooltip-bg');
+        const ttTitle     = getComputedVar('--tooltip-title');
+        const ttBody      = getComputedVar('--tooltip-body');
+        const ttBorder    = getComputedVar('--tooltip-border');
+
+        chart = new Chart(document.getElementById('mainChart').getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels,
+                datasets: [{ label: 'Units', data: values, backgroundColor: barColor, borderRadius: 4, borderSkipped: false, barThickness: mobile ? 14 : 22 }]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: ttBg, titleColor: ttTitle, bodyColor: ttBody,
+                        borderColor: ttBorder, borderWidth: 1,
+                        padding: mobile ? 14 : 10, caretSize: mobile ? 8 : 5,
+                        titleFont: { family: 'DM Mono', size: mobile ? 13 : 11 },
+                        bodyFont:  { family: 'DM Mono', size: mobile ? 13 : 11 },
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { font: { family: 'DM Mono', size: mobile ? 9 : 10 }, color: tickColor, maxRotation: mobile ? 45 : 0 },
+                        border: { color: borderColor }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        ticks: { font: { family: 'DM Mono', size: mobile ? 9 : 10 }, color: tickColor },
+                        border: { color: 'transparent' }
+                    }
+                }
+            }
+        });
+    }
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(() => {
+            const l = Object.keys(masterData), v = Object.values(masterData);
+            if (l.length) buildChart(l.slice(0, 10), v.slice(0, 10));
+        }, 200);
+    });
+
+    /* ── Replenishment ── */
+    async function loadReplenishment() {
+        const lead = document.getElementById('lead-select').value;
+        document.getElementById('rep-lead-time').textContent = lead + ' days';
+        document.getElementById('rep-table-body').innerHTML =
+            '<tr><td colspan="6"><div class="loading">Loading…</div></td></tr>';
+        try {
+            const json = await fetch(`/replenishment?store=${currentStore}&lead_time=${lead}`).then(r => r.json());
+            if (json.error) { alert(json.error); return; }
+            document.getElementById('rep-orders-count').textContent = json.orders_needed;
+            const tbody = document.getElementById('rep-table-body');
+            tbody.innerHTML = '';
+            Object.entries(json.replenishment).forEach(([cat, d]) => {
+                const bc = d.action === 'ORDER' ? 'badge-red' : 'badge-green';
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${cat}</td>
+                    <td><span class="mono-val">${d.forecast_tomorrow.toLocaleString()}</span></td>
+                    <td><span class="mono-val">${d.safety_stock.toLocaleString()}</span></td>
+                    <td><span class="mono-val">${d.reorder_point.toLocaleString()}</span></td>
+                    <td><span class="mono-val">${d.recommended_order.toLocaleString()}</span></td>
+                    <td><span class="badge ${bc}">${d.action}</span></td>`;
+                tbody.appendChild(tr);
+            });
+            repLoaded = true;
+        } catch {
+            document.getElementById('rep-table-body').innerHTML =
+                '<tr><td colspan="6"><div class="empty-state"><span class="icon">✕</span>Failed to load data</div></td></tr>';
+        }
+    }
+
+    /* ── Metrics ── */
+    async function loadMetrics() {
+        document.getElementById('metrics-grid').innerHTML =
+            '<div class="loading" style="grid-column:1/-1">Computing metrics on test set…</div>';
+        try {
+            const json = await fetch(`/metrics?store=${currentStore}`).then(r => r.json());
+            if (json.error) { alert(json.error); return; }
+            document.getElementById('mean-mape').textContent =
+                json.summary.mean_mape !== null ? json.summary.mean_mape + '%' : '—';
+            document.getElementById('mean-rmse').textContent = json.summary.mean_rmse;
+            const grid = document.getElementById('metrics-grid');
+            grid.innerHTML = '';
+            Object.entries(json.by_category).forEach(([cat, m]) => {
+                const col = !m.mape ? '' : m.mape < 15 ? 'color:var(--green)' : m.mape < 35 ? 'color:var(--yellow)' : 'color:var(--red)';
+                const el = document.createElement('div');
+                el.className = 'metric-card';
+                const modelBadge = m.model === 'LSTM' ? 'badge-green' : m.model === 'LightGBM' ? 'badge-yellow' : 'badge-red';
+                el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                        <div class="cat-name" title="${cat}" style="margin-bottom:0">${cat}</div>
+                        <span class="badge ${modelBadge}" style="font-size:0.6rem;padding:2px 7px;flex-shrink:0;margin-left:6px">${m.model}</span>
+                    </div>
+                    <div class="metric-row"><span class="mlabel">MAPE</span><span class="mval" style="${col}">${m.mape !== null ? m.mape + '%' : '—'}</span></div>
+                    <div class="metric-row"><span class="mlabel">RMSE</span><span class="mval">${m.rmse !== null && m.rmse !== undefined ? m.rmse : '—'}</span></div>`;
+                grid.appendChild(el);
+            });
+            metricsLoaded = true;
+        } catch {
+            document.getElementById('metrics-grid').innerHTML =
+                '<div class="empty-state" style="grid-column:1/-1"><span class="icon">✕</span>Failed to load metrics</div>';
+        }
+    }
+</script>
+</body>
+</html>
