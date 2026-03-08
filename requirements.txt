@@ -1,6 +1,6 @@
---extra-index-url https://download.pytorch.org/whl/cpu
+--find-links https://download.pytorch.org/whl/torch_stable.html
 
-torch==2.2.1+cpu
+torch==2.2.0+cpu
 Flask
 gunicorn
 numpy
