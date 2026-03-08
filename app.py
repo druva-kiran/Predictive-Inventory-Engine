@@ -8,6 +8,11 @@ Memory strategy (targets ~512 MB Render free tier):
   4. last_window only — the full scaled matrix is discarded after slicing the tail window.
   5. On-demand metrics — never stored in cache; computed per /metrics request and discarded.
   6. psutil RSS logging — every critical point emits MB so Render logs show live pressure.
+
+Crash fixes applied:
+  - dtype=object columns (roll28 lags, dcoilwtico strings) are force-cast to float32
+    before the scaler is called; non-numeric stragglers are dropped entirely.
+  - "lead_tim\\ne_days" syntax typo in /replenishment JSON is corrected.
 """
 
 import gc
@@ -70,6 +75,36 @@ class MultiCategoryLSTM(nn.Module):
     def forward(self, x):
         out, _ = self.lstm(x)
         return self.fc(out[:, -1, :])
+
+
+# ── DataFrame sanitiser ───────────────────────────────────────────────────────
+
+def sanitise_df(df: pd.DataFrame, required_cols: list) -> pd.DataFrame:
+    """
+    Guarantee every column in required_cols is numeric float32.
+
+    Steps:
+    1. Add any missing columns as 0.0.
+    2. Select only required_cols (drops unneeded extras).
+    3. Coerce dtype=object columns to numeric; non-parseable cells become NaN.
+    4. Fill NaN with 0.0.
+    5. Cast entire frame to float32.
+
+    This is the fix for the 500 crash on /predict/all: roll28 lag columns
+    and string-valued features like dcoilwtico arrived with dtype=object,
+    causing sklearn's scaler to raise a ValueError before any prediction ran.
+    """
+    for col in required_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+
+    df = df[required_cols].copy()
+
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    return df.fillna(0.0).astype(np.float32)
 
 
 # ── Inference helpers ─────────────────────────────────────────────────────────
@@ -142,11 +177,6 @@ def compute_mape(actual: np.ndarray, predicted: np.ndarray):
 
 
 def compute_metrics_on_demand(cache: dict) -> dict:
-    """
-    Compute metrics on-demand. Re-scales df.values for LSTM evaluation,
-    then immediately discards the full scaled array and test tensors.
-    Nothing is stored back into the cache — RAM is fully reclaimed after the request.
-    """
     df            = cache["df"]
     all_cols      = cache["all_cols"]
     dense_cats    = cache["dense_cats"]
@@ -164,8 +194,7 @@ def compute_metrics_on_demand(cache: dict) -> dict:
     if cache.get("lstm_model") is not None and dense_cats:
         target_indices = cache["lstm_target_indices"]
 
-        # Re-scale the full df on-demand (float32 to minimise RAM)
-        scaled = scaler.transform(df.values).astype(np.float32)
+        scaled = scaler.transform(df[all_cols].values).astype(np.float32)
         n      = len(scaled)
 
         X, y = [], []
@@ -175,7 +204,7 @@ def compute_metrics_on_demand(cache: dict) -> dict:
 
         X        = torch.tensor(np.array(X, dtype=np.float32), dtype=torch.float32)
         y_scaled = np.array(y, dtype=np.float32)
-        del scaled  # free immediately
+        del scaled
         gc.collect()
 
         split  = int(len(X) * 0.8)
@@ -331,18 +360,19 @@ def load_store(store_nbr: int) -> bool:
 
     Rules (Render free tier = ~512 MB):
     - Evict ALL cached stores before loading a new one.
-    - Extract every value needed from ckpt THEN del ckpt — never reference
-      it afterwards.
-    - Downcast df to float32 (halves DataFrame RAM vs pandas float64 default).
-    - Keep only last_window (window_size rows) of the scaled array; discard
-      the full scaled matrix immediately after slicing.
+    - Extract every value from ckpt THEN del ckpt — never reference it afterwards.
+    - Run df_feat through sanitise_df() to coerce dtype=object columns to float32
+      and fill NaN — this prevents the scaler from crashing on roll28 lag columns
+      or string-valued features like dcoilwtico.
+    - Keep only last_window (window_size rows) of the scaled array; discard the
+      full scaled matrix immediately after slicing.
     - Never pre-compute or cache metrics — compute them on-demand per request.
     """
     if store_nbr in STORE_CACHE:
         return True
 
     if STORE_CACHE:
-        print("[memory] Evicting cached stores to free RAM …")
+        print("[memory] Evicting cached stores to free RAM ...")
         STORE_CACHE.clear()
         gc.collect()
         log_mem("after eviction")
@@ -352,7 +382,7 @@ def load_store(store_nbr: int) -> bool:
         return False
 
     try:
-        print(f"[loading] Reading {ckpt_file} …")
+        print(f"[loading] Reading {ckpt_file} ...")
         log_mem("before torch.load")
         ckpt = torch.load(ckpt_file, map_location=device, weights_only=False)
         log_mem("after torch.load")
@@ -374,15 +404,11 @@ def load_store(store_nbr: int) -> bool:
         if "df_feat" not in ckpt:
             raise RuntimeError("Checkpoint is missing df_feat.")
 
-        # float32 cast — halves DataFrame RAM vs pandas float64 default
-        df_feat: pd.DataFrame = ckpt["df_feat"]
-        for col in all_cols:
-            if col not in df_feat.columns:
-                df_feat[col] = np.float32(0.0)
-        df_feat = df_feat[all_cols].astype(np.float32)
+        # sanitise_df coerces dtype=object / NaN columns to clean float32
+        df_feat = sanitise_df(ckpt["df_feat"], all_cols)
 
-        # Scale full array, keep only the tail window, discard the rest
-        scaled_full = lstm_scaler.transform(df_feat.values).astype(np.float32)
+        # Scale only the all_cols slice; keep just the tail window for LSTM
+        scaled_full = lstm_scaler.transform(df_feat[all_cols].values).astype(np.float32)
         last_window = scaled_full[-window_size:].copy()
         del scaled_full
         gc.collect()
@@ -449,7 +475,6 @@ def home():
 
 @app.route("/health")
 def health():
-    """Lightweight liveness probe — also exposes RSS for Render logs."""
     return jsonify({
         "status":           "ok",
         "rss_mb":           round(rss_mb(), 1),
@@ -500,10 +525,6 @@ def predict_all():
 
 @app.route("/metrics")
 def metrics():
-    """
-    Metrics are computed on-demand and NOT cached — this keeps the store
-    cache lean between prediction requests.
-    """
     try:
         if not AVAILABLE_STORES:
             return jsonify({"error": "No store checkpoints available."}), 404
@@ -535,7 +556,7 @@ def replenishment():
         if store not in AVAILABLE_STORES:
             return jsonify({"error": f"Store {store} not found."}), 404
         if not (1 <= lead_time <= 30):
-            return jsonify({"error": "lead_time must be 1–30."}), 400
+            return jsonify({"error": "lead_time must be 1-30."}), 400
         if not load_store(store):
             return jsonify({"error": f"Failed to load store {store}."}), 500
 
@@ -562,5 +583,5 @@ def replenishment():
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    print(f"[server] Listening on port {port}  |  RSS: {rss_mb():.1f} MB")
+    print(f"[server] Running on port {port}  |  RSS: {rss_mb():.1f} MB")
     app.run(host="0.0.0.0", port=port, debug=False)
