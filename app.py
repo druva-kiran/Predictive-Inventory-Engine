@@ -387,6 +387,14 @@ def load_store(store_nbr: int) -> bool:
         ckpt = torch.load(ckpt_file, map_location=device, weights_only=False)
         log_mem("after torch.load")
 
+        # Fix: pandas 2.x saves column Index with StringDtype; older pandas on Render
+        # raises NotImplementedError when deserializing it. Convert to plain str immediately.
+        if "df_feat" in ckpt and isinstance(ckpt["df_feat"], pd.DataFrame):
+            ckpt["df_feat"].columns = ckpt["df_feat"].columns.astype(str)
+        for cat, cdf in ckpt.get("cross_store_dfs", {}).items():
+            if isinstance(cdf, pd.DataFrame):
+                cdf.columns = cdf.columns.astype(str)
+
         # ── Extract everything needed BEFORE del ckpt ─────────────────────
         all_cols              = ckpt["all_cols"]
         family_cols           = ckpt["family_cols"]
