@@ -263,7 +263,6 @@
             padding: 14px 16px;
             min-height: 90px;
             cursor: default;
-            /* Smooth lift on hover */
             transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
             box-shadow: var(--shadow);
         }
@@ -374,7 +373,6 @@
             <div class="card">
                 <div class="card-label">Engine</div>
                 <button class="btn-primary" id="run-btn" onclick="runInference()">RUN INFERENCE</button>
-                <!-- Fixed: directly calls switchTab with the correct tab element -->
                 <button class="btn-secondary" onclick="switchTab('metrics', document.getElementById('tab-metrics'))">VIEW METRICS</button>
                 <hr class="divider">
                 <div class="card-label">Filter</div>
@@ -464,26 +462,39 @@
         document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
         document.getElementById('theme-toggle').textContent = darkMode ? '☀️' : '🌙';
         document.getElementById('theme-color-meta').setAttribute('content', darkMode ? '#0f1117' : '#f5f4f0');
-        // Rebuild chart with new colors if data exists
         const l = Object.keys(masterData), v = Object.values(masterData);
         if (l.length) buildChart(l.slice(0, 10), v.slice(0, 10));
     }
 
     /* ── Startup ── */
+    /* FIX: was data.stores_cached — key does not exist in /status response.
+       Correct key returned by app.py is data.available_stores.             */
     window.addEventListener('load', async () => {
         try {
             const data = await fetch('/status').then(r => r.json());
             const sel  = document.getElementById('store-select');
             sel.innerHTML = '';
-            data.stores_cached.forEach(s => {
+
+            const stores = data.available_stores || [];   // ← FIXED
+            stores.forEach(s => {
                 const o = document.createElement('option');
                 o.value = s; o.textContent = `Store ${s}`;
-                if (s === 1) o.selected = true;
+                if (s === currentStore) o.selected = true;
                 sel.appendChild(o);
             });
+
+            /* If API returned nothing, keep the default Store 1 option */
+            if (!sel.options.length) {
+                const o = document.createElement('option');
+                o.value = 1; o.textContent = 'Store 1'; o.selected = true;
+                sel.appendChild(o);
+            }
+
             document.getElementById('device-label').textContent =
-                data.device.startsWith('cuda') ? 'CUDA ACTIVE' : 'CPU MODE';
-        } catch (_) {}
+                (data.device || '').startsWith('cuda') ? 'CUDA ACTIVE' : 'CPU MODE';
+        } catch (_) {
+            /* Network error — leave the hardcoded Store 1 option in place */
+        }
     });
 
     /* ── Store change ── */
