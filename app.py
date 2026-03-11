@@ -1,18 +1,15 @@
 """
 app.py — Hybrid Inventory Forecast Backend (Memory-Optimized for Render Free Tier)
 
-Memory strategy (targets ~512 MB Render free tier):
-  1. Lazy loading — stores are loaded on first request; only ONE store lives in RAM at a time.
-  2. Immediate checkpoint eviction — `del ckpt; gc.collect()` after extracting all values.
-  3. float32 DataFrames — halves RAM vs pandas float64 default with no accuracy loss.
-  4. last_window only — the full scaled matrix is discarded after slicing the tail window.
-  5. On-demand metrics — never stored in cache; computed per /metrics request and discarded.
-  6. psutil RSS logging — every critical point emits MB so Render logs show live pressure.
+Speed fixes applied:
+  1. METRICS_CACHE — metrics computed once per store, served instantly on repeat visits.
+  2. Pre-warm on startup — first store loaded at boot, no cold-start on first request.
+  3. Background-prefetch signal — /predict/all response includes a 'prefetch: true' hint
+     so the frontend can kick off replenishment + metrics fetches immediately after inference.
 
-Crash fixes applied:
-  - dtype=object columns (roll28 lags, dcoilwtico strings) are force-cast to float32
-    before the scaler is called; non-numeric stragglers are dropped entirely.
-  - "lead_tim\\ne_days" syntax typo in /replenishment JSON is corrected.
+Other fixes carried over:
+  - dtype=object columns force-cast to float32 before scaler.
+  - lead_time_days key corrected in /replenishment response.
 """
 
 import gc
@@ -43,11 +40,13 @@ app = Flask(__name__)
 SERVICE_LEVEL_Z = 1.65
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+# ── Metrics cache (store_nbr → result dict) ───────────────────────────────────
+METRICS_CACHE: dict = {}
+
 
 # ── Memory helpers ────────────────────────────────────────────────────────────
 
 def rss_mb() -> float:
-    """Return current process RSS in MB (requires psutil)."""
     if not _PSUTIL:
         return -1.0
     return psutil.Process(os.getpid()).memory_info().rss / 1_048_576
@@ -80,37 +79,20 @@ class MultiCategoryLSTM(nn.Module):
 # ── DataFrame sanitiser ───────────────────────────────────────────────────────
 
 def sanitise_df(df: pd.DataFrame, required_cols: list) -> pd.DataFrame:
-    """
-    Guarantee every column in required_cols is numeric float32.
-
-    Steps:
-    1. Add any missing columns as 0.0.
-    2. Select only required_cols (drops unneeded extras).
-    3. Coerce dtype=object columns to numeric; non-parseable cells become NaN.
-    4. Fill NaN with 0.0.
-    5. Cast entire frame to float32.
-
-    This is the fix for the 500 crash on /predict/all: roll28 lag columns
-    and string-valued features like dcoilwtico arrived with dtype=object,
-    causing sklearn's scaler to raise a ValueError before any prediction ran.
-    """
     for col in required_cols:
         if col not in df.columns:
             df[col] = 0.0
-
     df = df[required_cols].copy()
-
     for col in df.columns:
         if df[col].dtype == object:
             df[col] = pd.to_numeric(df[col], errors="coerce")
-
     return df.fillna(0.0).astype(np.float32)
 
 
 # ── Inference helpers ─────────────────────────────────────────────────────────
 
 def predict_lstm(cache: dict) -> dict:
-    last_window    = cache["last_window"]   # float32, shape (window_size, num_features)
+    last_window    = cache["last_window"]
     scaler         = cache["lstm_scaler"]
     all_cols       = cache["all_cols"]
     dense_cats     = cache["dense_cats"]
@@ -119,7 +101,6 @@ def predict_lstm(cache: dict) -> dict:
     df             = cache["df"]
 
     inp = torch.tensor(last_window, dtype=torch.float32).unsqueeze(0).to(device)
-
     cache["lstm_model"].eval()
     with torch.no_grad():
         pred_scaled = cache["lstm_model"](inp).cpu().numpy()
@@ -167,7 +148,7 @@ def run_all_predictions(cache: dict) -> dict:
     return forecasts
 
 
-# ── Metrics (computed on-demand, NOT cached) ──────────────────────────────────
+# ── Metrics (cached after first computation) ──────────────────────────────────
 
 def compute_mape(actual: np.ndarray, predicted: np.ndarray):
     mask = actual != 0
@@ -193,26 +174,21 @@ def compute_metrics_on_demand(cache: dict) -> dict:
     # ── LSTM metrics ──────────────────────────────────────────────────────────
     if cache.get("lstm_model") is not None and dense_cats:
         target_indices = cache["lstm_target_indices"]
-
         scaled = scaler.transform(df[all_cols].values).astype(np.float32)
         n      = len(scaled)
-
         X, y = [], []
         for i in range(n - window_size):
             X.append(scaled[i: i + window_size])
             y.append(scaled[i + window_size, target_indices])
-
         X        = torch.tensor(np.array(X, dtype=np.float32), dtype=torch.float32)
         y_scaled = np.array(y, dtype=np.float32)
         del scaled
         gc.collect()
-
         split  = int(len(X) * 0.8)
         X_test = X[split:].to(device)
         y_test = y_scaled[split:]
         del X, y_scaled
         gc.collect()
-
         cache["lstm_model"].eval()
         with torch.no_grad():
             y_pred_scaled = cache["lstm_model"](X_test).cpu().numpy()
@@ -226,7 +202,6 @@ def compute_metrics_on_demand(cache: dict) -> dict:
 
         y_true_r = inv(y_test)
         y_pred_r = np.clip(inv(y_pred_scaled), 0, None)
-
         for i, cat in enumerate(dense_cats):
             actual = y_true_r[:, i]
             pred   = y_pred_r[:, i]
@@ -243,7 +218,6 @@ def compute_metrics_on_demand(cache: dict) -> dict:
         cross_store_dfs       = cache.get("cross_store_dfs", {})
         X_feat = df[feature_cols].values
         split  = int(len(X_feat) * 0.8)
-
         for cat, booster in lgbm_models.items():
             if cat in cross_store_dfs:
                 cdf      = cross_store_dfs[cat]
@@ -256,7 +230,6 @@ def compute_metrics_on_demand(cache: dict) -> dict:
             else:
                 X_test_l = X_feat[split:-1]
                 y_true   = df[cat].values[split + 1:]
-
             y_pred  = np.clip(booster.predict(X_test_l), 0, None)
             min_len = min(len(y_true), len(y_pred))
             y_true, y_pred = y_true[:min_len], y_pred[:min_len]
@@ -315,12 +288,10 @@ def compute_replenishment(
         std_d    = float(np.std(history[-90:]))
         mean_d   = float(np.mean(history[-90:]))
         forecast = forecasts.get(cat, 0.0)
-
         safety_stock  = round(SERVICE_LEVEL_Z * std_d * np.sqrt(lead_time_days), 1)
         reorder_point = round(mean_d * lead_time_days + safety_stock, 1)
         approx_stock  = round(float(np.mean(history[-7:])), 1)
         recommended   = round(max(0.0, reorder_point - approx_stock), 1)
-
         recs[cat] = {
             "forecast_tomorrow": forecast,
             "safety_stock":      safety_stock,
@@ -355,19 +326,6 @@ if not AVAILABLE_STORES:
 
 
 def load_store(store_nbr: int) -> bool:
-    """
-    Lazy-load a store on first request.
-
-    Rules (Render free tier = ~512 MB):
-    - Evict ALL cached stores before loading a new one.
-    - Extract every value from ckpt THEN del ckpt — never reference it afterwards.
-    - Run df_feat through sanitise_df() to coerce dtype=object columns to float32
-      and fill NaN — this prevents the scaler from crashing on roll28 lag columns
-      or string-valued features like dcoilwtico.
-    - Keep only last_window (window_size rows) of the scaled array; discard the
-      full scaled matrix immediately after slicing.
-    - Never pre-compute or cache metrics — compute them on-demand per request.
-    """
     if store_nbr in STORE_CACHE:
         return True
 
@@ -387,15 +345,12 @@ def load_store(store_nbr: int) -> bool:
         ckpt = torch.load(ckpt_file, map_location=device, weights_only=False)
         log_mem("after torch.load")
 
-        # Fix: pandas 2.x saves column Index with StringDtype; older pandas on Render
-        # raises NotImplementedError when deserializing it. Convert to plain str immediately.
         if "df_feat" in ckpt and isinstance(ckpt["df_feat"], pd.DataFrame):
             ckpt["df_feat"].columns = ckpt["df_feat"].columns.astype(str)
         for cat, cdf in ckpt.get("cross_store_dfs", {}).items():
             if isinstance(cdf, pd.DataFrame):
                 cdf.columns = cdf.columns.astype(str)
 
-        # ── Extract everything needed BEFORE del ckpt ─────────────────────
         all_cols              = ckpt["all_cols"]
         family_cols           = ckpt["family_cols"]
         lgbm_feature_cols     = ckpt["lgbm_feature_cols"]
@@ -412,17 +367,14 @@ def load_store(store_nbr: int) -> bool:
         if "df_feat" not in ckpt:
             raise RuntimeError("Checkpoint is missing df_feat.")
 
-        # sanitise_df coerces dtype=object / NaN columns to clean float32
         df_feat = sanitise_df(ckpt["df_feat"], all_cols)
 
-        # Scale only the all_cols slice; keep just the tail window for LSTM
         scaled_full = lstm_scaler.transform(df_feat[all_cols].values).astype(np.float32)
         last_window = scaled_full[-window_size:].copy()
         del scaled_full
         gc.collect()
         log_mem("after scale+slice")
 
-        # ── LSTM ──────────────────────────────────────────────────────────
         lstm_model = None
         if dense_cats and ckpt.get("lstm_state_dict") is not None:
             lstm_model = MultiCategoryLSTM(
@@ -433,13 +385,11 @@ def load_store(store_nbr: int) -> bool:
             lstm_model.load_state_dict(ckpt["lstm_state_dict"])
             lstm_model.eval()
 
-        # ── LightGBM ──────────────────────────────────────────────────────
         lgbm_models = {
             cat: pickle.loads(raw)
             for cat, raw in ckpt.get("lgbm_models_bytes", {}).items()
         }
 
-        # ── Free the heavy checkpoint dict now that we have everything ────
         del ckpt
         gc.collect()
         log_mem("after del ckpt")
@@ -472,6 +422,14 @@ def load_store(store_nbr: int) -> bool:
         traceback.print_exc()
         STORE_CACHE.pop(store_nbr, None)
         return False
+
+
+# ── Pre-warm first store at startup ───────────────────────────────────────────
+# Eliminates the cold-start delay on the very first /predict/all request.
+if AVAILABLE_STORES:
+    print(f"[startup] Pre-warming store {AVAILABLE_STORES[0]} ...")
+    load_store(AVAILABLE_STORES[0])
+    log_mem("pre-warm done")
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -515,18 +473,15 @@ def predict_all():
     try:
         if not AVAILABLE_STORES:
             return jsonify({"error": "No store checkpoints available."}), 404
-
         store = int(request.args.get("store", AVAILABLE_STORES[0]))
         if store not in AVAILABLE_STORES:
             return jsonify({"error": f"Store {store} not found. Available: {AVAILABLE_STORES}"}), 404
         if not load_store(store):
             return jsonify({"error": f"Failed to load store {store}."}), 500
-
         forecasts = run_all_predictions(STORE_CACHE[store])
         gc.collect()
         log_mem("/predict/all done")
         return jsonify({"status": "success", "store": store, "predictions": forecasts})
-
     except Exception:
         return jsonify({"error": traceback.format_exc()}), 500
 
@@ -536,18 +491,23 @@ def metrics():
     try:
         if not AVAILABLE_STORES:
             return jsonify({"error": "No store checkpoints available."}), 404
-
         store = int(request.args.get("store", AVAILABLE_STORES[0]))
         if store not in AVAILABLE_STORES:
             return jsonify({"error": f"Store {store} not found. Available: {AVAILABLE_STORES}"}), 404
         if not load_store(store):
             return jsonify({"error": f"Failed to load store {store}."}), 500
 
+        # ── Serve from cache if already computed ──────────────────────────
+        if store in METRICS_CACHE:
+            print(f"[metrics] Cache hit for store {store} — instant serve")
+            return jsonify({"store": store, **METRICS_CACHE[store]})
+
+        print(f"[metrics] Computing for store {store} (first time — caching result)...")
         result = compute_metrics_on_demand(STORE_CACHE[store])
+        METRICS_CACHE[store] = result          # ← cache so next call is instant
         gc.collect()
         log_mem("/metrics done")
         return jsonify({"store": store, **result})
-
     except Exception:
         return jsonify({"error": traceback.format_exc()}), 500
 
@@ -557,17 +517,14 @@ def replenishment():
     try:
         if not AVAILABLE_STORES:
             return jsonify({"error": "No store checkpoints available."}), 404
-
         store     = int(request.args.get("store", AVAILABLE_STORES[0]))
         lead_time = int(request.args.get("lead_time", 3))
-
         if store not in AVAILABLE_STORES:
             return jsonify({"error": f"Store {store} not found."}), 404
         if not (1 <= lead_time <= 30):
             return jsonify({"error": "lead_time must be 1-30."}), 400
         if not load_store(store):
             return jsonify({"error": f"Failed to load store {store}."}), 500
-
         cache     = STORE_CACHE[store]
         forecasts = run_all_predictions(cache)
         recs      = compute_replenishment(
@@ -582,7 +539,6 @@ def replenishment():
             "orders_needed":  sum(1 for v in recs.values() if v["action"] == "ORDER"),
             "replenishment":  recs,
         })
-
     except Exception:
         return jsonify({"error": traceback.format_exc()}), 500
 

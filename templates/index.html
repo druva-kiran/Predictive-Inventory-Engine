@@ -10,7 +10,6 @@
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-        /* ── Light theme (default) ── */
         :root {
             --bg: #f5f4f0;
             --surface: #ffffff;
@@ -44,7 +43,6 @@
             --shadow-hover: 0 6px 24px rgba(0,0,0,0.10);
         }
 
-        /* ── Dark theme ── */
         [data-theme="dark"] {
             --bg: #0f1117;
             --surface: #1a1d24;
@@ -87,7 +85,6 @@
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse  { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 
-        /* ── Header ── */
         header {
             display: flex; flex-direction: column; gap: 12px;
             margin-bottom: 20px; padding-bottom: 20px;
@@ -98,13 +95,10 @@
         .header-left h1 { font-size: 1.35rem; font-weight: 500; letter-spacing: -0.03em; }
         .header-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 
-        /* ── Dark mode toggle ── */
         .theme-toggle {
             width: var(--touch); height: var(--touch);
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            background: var(--surface);
-            cursor: pointer;
+            border-radius: var(--radius-sm); border: 1px solid var(--border);
+            background: var(--surface); cursor: pointer;
             display: flex; align-items: center; justify-content: center;
             font-size: 1.1rem;
             transition: background 0.2s, border-color 0.2s, transform 0.15s;
@@ -135,7 +129,6 @@
         }
         .status-dot { width: 6px; height: 6px; background: var(--green); border-radius: 50%; flex-shrink: 0; animation: pulse 2s infinite; }
 
-        /* ── Tabs ── */
         .tabs-wrap {
             position: relative; margin-bottom: 16px;
             animation: fadeUp 0.4s 0.05s ease both;
@@ -158,11 +151,9 @@
         .tab:hover  { color: var(--text-primary); background: var(--surface); }
         .tab.active { color: var(--text-primary); background: var(--surface); border-color: var(--border); }
 
-        /* ── Panels ── */
         .panel { display: none; }
         .panel.active { display: block; }
 
-        /* ── Cards ── */
         .card {
             background: var(--surface); border: 1px solid var(--border);
             border-radius: var(--radius); padding: 18px; margin-bottom: 12px;
@@ -173,7 +164,6 @@
             text-transform: uppercase; color: var(--text-secondary); margin-bottom: 16px;
         }
 
-        /* ── Buttons ── */
         .btn-primary, .btn-secondary {
             width: 100%; height: var(--touch); border-radius: var(--radius-sm);
             font-family: var(--mono); font-size: 0.78rem; letter-spacing: 0.08em;
@@ -200,14 +190,12 @@
         .search-input::placeholder { color: var(--text-secondary); }
         .search-input:focus { border-color: var(--accent); }
 
-        /* ── Chart ── */
         .chart-meta { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; gap: 12px; }
         .chart-stat { text-align: right; flex-shrink: 0; }
         .chart-stat .big-num { font-size: 1.4rem; font-weight: 500; letter-spacing: -0.04em; line-height: 1; }
         .chart-stat .sub { font-family: var(--mono); font-size: 0.66rem; color: var(--text-secondary); margin-top: 3px; }
         .chart-wrap { position: relative; width: 100%; height: 220px; }
 
-        /* ── Stat Row ── */
         .stat-row {
             display: grid; grid-template-columns: repeat(3, 1fr);
             gap: 10px; margin-bottom: 12px;
@@ -223,7 +211,6 @@
         .stat-card .value.good { color: var(--green); }
         .stat-card .value.warn { color: var(--yellow); }
 
-        /* ── Tables ── */
         .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
         .table-count  { font-family: var(--mono); font-size: 0.7rem; color: var(--text-secondary); }
         .table-scroll { overflow-x: auto; overflow-y: auto; max-height: 400px; -webkit-overflow-scrolling: touch; }
@@ -251,31 +238,19 @@
         .badge-red    { color: var(--red);    background: var(--red-light); }
         .badge-yellow { color: var(--yellow); background: var(--yellow-light); }
 
-        /* ── Metric Cards ── */
         .metrics-grid {
             display: grid; grid-template-columns: repeat(2, 1fr);
             gap: 10px; animation: fadeUp 0.4s ease both;
         }
         .metric-card {
-            background: var(--surface);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px 16px;
-            min-height: 90px;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 12px; padding: 14px 16px; min-height: 90px;
             cursor: default;
             transition: background 0.2s, border-color 0.2s, box-shadow 0.2s, transform 0.2s;
             box-shadow: var(--shadow);
         }
-        .metric-card:hover {
-            background: var(--surface-hover);
-            border-color: var(--text-secondary);
-            box-shadow: var(--shadow-hover);
-            transform: translateY(-2px);
-        }
-        .metric-card .cat-name {
-            font-size: 0.82rem; font-weight: 500; margin-bottom: 10px;
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-        }
+        .metric-card:hover { background: var(--surface-hover); border-color: var(--text-secondary); box-shadow: var(--shadow-hover); transform: translateY(-2px); }
+        .metric-card .cat-name { font-size: 0.82rem; font-weight: 500; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .metric-row { display: flex; justify-content: space-between; align-items: center; margin-top: 5px; }
         .metric-row .mlabel { font-family: var(--mono); font-size: 0.63rem; color: var(--text-secondary); }
         .metric-row .mval   { font-family: var(--mono); font-size: 0.78rem; font-weight: 500; }
@@ -290,20 +265,34 @@
             background: transparent; color: var(--text-secondary);
             border: 1px solid var(--border);
             transition: all 0.2s; white-space: nowrap;
-            display: flex; align-items: center;
+            display: flex; align-items: center; gap: 6px;
         }
         .btn-inline:hover { border-color: var(--accent); color: var(--text-primary); }
 
-        /* ── Empty / Loading ── */
+        /* ── Download button — green tint ── */
+        .btn-download {
+            height: var(--touch); padding: 0 16px; width: auto;
+            border-radius: var(--radius-sm); font-family: var(--mono);
+            font-size: 0.72rem; letter-spacing: 0.06em; cursor: pointer;
+            background: var(--green-light); color: var(--green);
+            border: 1px solid var(--green-border);
+            transition: all 0.2s; white-space: nowrap;
+            display: flex; align-items: center; gap: 6px;
+        }
+        .btn-download:hover { background: var(--green); color: #fff; border-color: var(--green); }
+        .btn-download:disabled { opacity: 0.35; cursor: not-allowed; }
+
+        /* ── Loading with elapsed timer ── */
+        .loading { text-align: center; padding: 36px; font-family: var(--mono); font-size: 0.76rem; color: var(--text-secondary); }
+        .loading .elapsed { display: block; margin-top: 8px; font-size: 0.68rem; color: var(--text-secondary); opacity: 0.7; }
+
         .empty-state { text-align: center; padding: 48px 20px; color: var(--text-secondary); font-family: var(--mono); font-size: 0.78rem; }
         .empty-state .icon { font-size: 1.8rem; margin-bottom: 10px; opacity: 0.22; display: block; }
-        .loading { text-align: center; padding: 36px; font-family: var(--mono); font-size: 0.76rem; color: var(--text-secondary); }
 
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 
-        /* ══ Tablet ≥640px ══ */
         @media (min-width: 640px) {
             body { padding: 28px 28px 56px; }
             header { flex-direction: row; align-items: center; gap: 16px; }
@@ -316,7 +305,6 @@
             .search-input { font-size: 0.82rem; }
         }
 
-        /* ══ Desktop ≥900px ══ */
         @media (min-width: 900px) {
             body { padding: 40px 40px 64px; }
             .header-left h1 { font-size: 1.6rem; }
@@ -341,7 +329,6 @@
 <body>
 <div class="wrapper">
 
-    <!-- ── Header ── -->
     <header>
         <div class="header-top">
             <div class="header-left"><h1>Inventory Forecast</h1></div>
@@ -358,12 +345,11 @@
         </div>
     </header>
 
-    <!-- ── Tabs ── -->
     <div class="tabs-wrap">
         <div class="tabs" role="tablist">
-            <button class="tab active" id="tab-forecast"       role="tab" onclick="switchTab('forecast', this)">FORECAST</button>
-            <button class="tab"        id="tab-replenishment"  role="tab" onclick="switchTab('replenishment', this)">REPLENISHMENT</button>
-            <button class="tab"        id="tab-metrics"        role="tab" onclick="switchTab('metrics', this)">METRICS</button>
+            <button class="tab active" id="tab-forecast"      role="tab" onclick="switchTab('forecast', this)">FORECAST</button>
+            <button class="tab"        id="tab-replenishment" role="tab" onclick="switchTab('replenishment', this)">REPLENISHMENT</button>
+            <button class="tab"        id="tab-metrics"       role="tab" onclick="switchTab('metrics', this)">METRICS</button>
         </div>
     </div>
 
@@ -421,7 +407,9 @@
                         <option value="3" selected>Lead: 3d</option>
                         <option value="7">Lead: 7d</option>
                     </select>
-                    <button class="btn-inline" onclick="loadReplenishment()">REFRESH</button>
+                    <button class="btn-inline" onclick="loadReplenishment()">↻ REFRESH</button>
+                    <!-- Download ORDER items only -->
+                    <button class="btn-download" id="dl-btn" onclick="downloadOrders()" disabled>⬇ DOWNLOAD ORDERS</button>
                 </div>
             </div>
             <div class="table-scroll">
@@ -447,14 +435,25 @@
         </div>
     </div>
 
-</div>
+</div><!-- /wrapper -->
+
 <script>
-    let masterData    = {};
+    let masterData   = {};
     let chart;
-    let currentStore  = 1;
+    let currentStore = 1;
     let metricsLoaded = false;
     let repLoaded     = false;
     let darkMode      = false;
+
+    // Cached background data so tab switches are instant
+    let cachedRep     = null;
+    let cachedMetrics = null;
+
+    // Stored full replenishment JSON for download
+    let lastRepJson   = null;
+
+    // ── Keepalive — prevents Render dyno sleep ────────────────────────────────
+    setInterval(() => fetch('/health').catch(() => {}), 600_000);
 
     /* ── Dark mode ── */
     function toggleTheme() {
@@ -467,47 +466,43 @@
     }
 
     /* ── Startup ── */
-    /* FIX: was data.stores_cached — key does not exist in /status response.
-       Correct key returned by app.py is data.available_stores.             */
     window.addEventListener('load', async () => {
         try {
             const data = await fetch('/status').then(r => r.json());
             const sel  = document.getElementById('store-select');
             sel.innerHTML = '';
-
-            const stores = data.available_stores || [];   // ← FIXED
+            const stores = data.available_stores || [];
             stores.forEach(s => {
                 const o = document.createElement('option');
                 o.value = s; o.textContent = `Store ${s}`;
                 if (s === currentStore) o.selected = true;
                 sel.appendChild(o);
             });
-
-            /* If API returned nothing, keep the default Store 1 option */
             if (!sel.options.length) {
                 const o = document.createElement('option');
                 o.value = 1; o.textContent = 'Store 1'; o.selected = true;
                 sel.appendChild(o);
             }
-
             document.getElementById('device-label').textContent =
                 (data.device || '').startsWith('cuda') ? 'CUDA ACTIVE' : 'CPU MODE';
-        } catch (_) {
-            /* Network error — leave the hardcoded Store 1 option in place */
-        }
+        } catch (_) {}
     });
 
     /* ── Store change ── */
     function onStoreChange() {
-        currentStore = parseInt(document.getElementById('store-select').value);
+        currentStore  = parseInt(document.getElementById('store-select').value);
         metricsLoaded = repLoaded = false;
-        masterData = {};
+        cachedRep     = null;
+        cachedMetrics = null;
+        lastRepJson   = null;
+        masterData    = {};
         if (chart) { chart.destroy(); chart = null; }
         document.getElementById('total-val').textContent = '—';
         document.getElementById('row-count').textContent = '';
         document.getElementById('mean-mape').textContent = '—';
         document.getElementById('mean-rmse').textContent = '—';
         document.getElementById('rep-orders-count').textContent = '—';
+        document.getElementById('dl-btn').disabled = true;
         document.getElementById('table-body').innerHTML =
             '<tr><td colspan="3"><div class="empty-state"><span class="icon">◌</span>Run inference to load predictions</div></td></tr>';
         document.getElementById('rep-table-body').innerHTML =
@@ -519,11 +514,19 @@
     /* ── Tabs ── */
     function switchTab(name, btn) {
         document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t   => t.classList.remove('active'));
         document.getElementById('panel-' + name).classList.add('active');
         btn.classList.add('active');
-        if (name === 'replenishment' && !repLoaded) loadReplenishment();
-        if (name === 'metrics'       && !metricsLoaded) loadMetrics();
+
+        // If background fetch already completed, render instantly
+        if (name === 'replenishment') {
+            if (cachedRep) { renderRepData(cachedRep); }
+            else if (!repLoaded) loadReplenishment();
+        }
+        if (name === 'metrics') {
+            if (cachedMetrics) { renderMetricsData(cachedMetrics); }
+            else if (!metricsLoaded) loadMetrics();
+        }
     }
 
     /* ── Forecast ── */
@@ -536,6 +539,19 @@
             if (json.error) { alert(json.error); return; }
             masterData = json.predictions;
             renderForecast();
+
+            // ── Background-prefetch replenishment & metrics immediately
+            //    so both tabs are instant when the user clicks them.
+            const lead = document.getElementById('lead-select').value;
+            fetch(`/replenishment?store=${currentStore}&lead_time=${lead}`)
+                .then(r => r.json())
+                .then(j => { if (!j.error) { cachedRep = j; lastRepJson = j; } })
+                .catch(() => {});
+            fetch(`/metrics?store=${currentStore}`)
+                .then(r => r.json())
+                .then(j => { if (!j.error) { cachedMetrics = j; } })
+                .catch(() => {});
+
         } catch {
             alert('API connection failed. Is Flask running on port 5000?');
         } finally {
@@ -545,7 +561,7 @@
     }
 
     function renderForecast() {
-        const tbody = document.getElementById('table-body');
+        const tbody  = document.getElementById('table-body');
         tbody.innerHTML = '';
         const labels = Object.keys(masterData);
         const values = Object.values(masterData);
@@ -566,7 +582,11 @@
         const q    = document.getElementById('search-input').value.toUpperCase();
         const rows = document.getElementById('table-body').getElementsByTagName('tr');
         let vis = 0;
-        for (const r of rows) { const s = r.innerText.toUpperCase().includes(q); r.style.display = s ? '' : 'none'; if (s) vis++; }
+        for (const r of rows) {
+            const s = r.innerText.toUpperCase().includes(q);
+            r.style.display = s ? '' : 'none';
+            if (s) vis++;
+        }
         const k = Object.keys(masterData);
         if (k.length) document.getElementById('row-count').textContent = vis + ' / ' + k.length + ' categories';
     }
@@ -577,7 +597,7 @@
 
     function buildChart(labels, values) {
         if (chart) chart.destroy();
-        const mobile = window.innerWidth < 640;
+        const mobile      = window.innerWidth < 640;
         const barColor    = getComputedVar('--chart-bar');
         const gridColor   = getComputedVar('--chart-grid');
         const tickColor   = getComputedVar('--chart-tick');
@@ -586,7 +606,6 @@
         const ttTitle     = getComputedVar('--tooltip-title');
         const ttBody      = getComputedVar('--tooltip-body');
         const ttBorder    = getComputedVar('--tooltip-border');
-
         chart = new Chart(document.getElementById('mainChart').getContext('2d'), {
             type: 'bar',
             data: {
@@ -635,61 +654,143 @@
         const lead = document.getElementById('lead-select').value;
         document.getElementById('rep-lead-time').textContent = lead + ' days';
         document.getElementById('rep-table-body').innerHTML =
-            '<tr><td colspan="6"><div class="loading">Loading…</div></td></tr>';
+            '<tr><td colspan="6"><div class="loading">Loading…<span class="elapsed" id="rep-elapsed"></span></div></td></tr>';
+
+        // Elapsed timer so users know it's working
+        const start = Date.now();
+        const timer = setInterval(() => {
+            const el = document.getElementById('rep-elapsed');
+            if (el) el.textContent = Math.round((Date.now() - start) / 1000) + 's elapsed';
+        }, 1000);
+
         try {
             const json = await fetch(`/replenishment?store=${currentStore}&lead_time=${lead}`).then(r => r.json());
+            clearInterval(timer);
             if (json.error) { alert(json.error); return; }
-            document.getElementById('rep-orders-count').textContent = json.orders_needed;
-            const tbody = document.getElementById('rep-table-body');
-            tbody.innerHTML = '';
-            Object.entries(json.replenishment).forEach(([cat, d]) => {
-                const bc = d.action === 'ORDER' ? 'badge-red' : 'badge-green';
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td>${cat}</td>
-                    <td><span class="mono-val">${d.forecast_tomorrow.toLocaleString()}</span></td>
-                    <td><span class="mono-val">${d.safety_stock.toLocaleString()}</span></td>
-                    <td><span class="mono-val">${d.reorder_point.toLocaleString()}</span></td>
-                    <td><span class="mono-val">${d.recommended_order.toLocaleString()}</span></td>
-                    <td><span class="badge ${bc}">${d.action}</span></td>`;
-                tbody.appendChild(tr);
-            });
+            lastRepJson = json;
+            cachedRep   = json;
+            renderRepData(json);
             repLoaded = true;
         } catch {
+            clearInterval(timer);
             document.getElementById('rep-table-body').innerHTML =
                 '<tr><td colspan="6"><div class="empty-state"><span class="icon">✕</span>Failed to load data</div></td></tr>';
         }
     }
 
+    function renderRepData(json) {
+        document.getElementById('rep-lead-time').textContent = (json.lead_time_days || 3) + ' days';
+        document.getElementById('rep-orders-count').textContent = json.orders_needed;
+
+        const tbody = document.getElementById('rep-table-body');
+        tbody.innerHTML = '';
+        Object.entries(json.replenishment).forEach(([cat, d]) => {
+            const bc = d.action === 'ORDER' ? 'badge-red' : 'badge-green';
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${cat}</td>
+                <td><span class="mono-val">${d.forecast_tomorrow.toLocaleString()}</span></td>
+                <td><span class="mono-val">${d.safety_stock.toLocaleString()}</span></td>
+                <td><span class="mono-val">${d.reorder_point.toLocaleString()}</span></td>
+                <td><span class="mono-val">${d.recommended_order.toLocaleString()}</span></td>
+                <td><span class="badge ${bc}">${d.action}</span></td>`;
+            tbody.appendChild(tr);
+        });
+
+        // Enable download button only when there are ORDER items
+        const hasOrders = json.orders_needed > 0;
+        document.getElementById('dl-btn').disabled = !hasOrders;
+        repLoaded = true;
+    }
+
+    /* ── Download ORDER items as CSV ── */
+    function downloadOrders() {
+        if (!lastRepJson) return;
+        const orders = Object.entries(lastRepJson.replenishment)
+            .filter(([, d]) => d.action === 'ORDER');
+
+        if (!orders.length) { alert('No ORDER items to download.'); return; }
+
+        const store    = lastRepJson.store || currentStore;
+        const lead     = lastRepJson.lead_time_days || 3;
+        const date     = new Date().toISOString().slice(0, 10);
+
+        // Build CSV
+        const header = ['Category', 'Forecast Tomorrow', 'Safety Stock', 'Reorder Point', 'Approx Stock', 'Recommended Order', 'Lead Time Days', 'Store'];
+        const rows   = orders.map(([cat, d]) => [
+            cat,
+            d.forecast_tomorrow,
+            d.safety_stock,
+            d.reorder_point,
+            d.approx_stock,
+            d.recommended_order,
+            lead,
+            store,
+        ]);
+
+        const csv = [header, ...rows]
+            .map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))
+            .join('\n');
+
+        // Trigger browser download
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `orders_store${store}_lead${lead}_${date}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
     /* ── Metrics ── */
     async function loadMetrics() {
-        document.getElementById('metrics-grid').innerHTML =
-            '<div class="loading" style="grid-column:1/-1">Computing metrics on test set…</div>';
+        // Show elapsed timer so users know it's working (first load can take ~30–60s)
+        const start = Date.now();
+        const timer = setInterval(() => {
+            const s   = Math.round((Date.now() - start) / 1000);
+            const hint = s > 8
+                ? `<span class="elapsed">first load ~30–60s · cached after ✓</span>`
+                : `<span class="elapsed">${s}s elapsed</span>`;
+            document.getElementById('metrics-grid').innerHTML =
+                `<div class="loading" style="grid-column:1/-1">Computing on test set… ${hint}</div>`;
+        }, 1000);
+
         try {
             const json = await fetch(`/metrics?store=${currentStore}`).then(r => r.json());
+            clearInterval(timer);
             if (json.error) { alert(json.error); return; }
-            document.getElementById('mean-mape').textContent =
-                json.summary.mean_mape !== null ? json.summary.mean_mape + '%' : '—';
-            document.getElementById('mean-rmse').textContent = json.summary.mean_rmse;
-            const grid = document.getElementById('metrics-grid');
-            grid.innerHTML = '';
-            Object.entries(json.by_category).forEach(([cat, m]) => {
-                const col = !m.mape ? '' : m.mape < 15 ? 'color:var(--green)' : m.mape < 35 ? 'color:var(--yellow)' : 'color:var(--red)';
-                const el = document.createElement('div');
-                el.className = 'metric-card';
-                const modelBadge = m.model === 'LSTM' ? 'badge-green' : m.model === 'LightGBM' ? 'badge-yellow' : 'badge-red';
-                el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-                        <div class="cat-name" title="${cat}" style="margin-bottom:0">${cat}</div>
-                        <span class="badge ${modelBadge}" style="font-size:0.6rem;padding:2px 7px;flex-shrink:0;margin-left:6px">${m.model}</span>
-                    </div>
-                    <div class="metric-row"><span class="mlabel">MAPE</span><span class="mval" style="${col}">${m.mape !== null ? m.mape + '%' : '—'}</span></div>
-                    <div class="metric-row"><span class="mlabel">RMSE</span><span class="mval">${m.rmse !== null && m.rmse !== undefined ? m.rmse : '—'}</span></div>`;
-                grid.appendChild(el);
-            });
+            cachedMetrics = json;
+            renderMetricsData(json);
             metricsLoaded = true;
         } catch {
+            clearInterval(timer);
             document.getElementById('metrics-grid').innerHTML =
                 '<div class="empty-state" style="grid-column:1/-1"><span class="icon">✕</span>Failed to load metrics</div>';
         }
+    }
+
+    function renderMetricsData(json) {
+        document.getElementById('mean-mape').textContent =
+            json.summary.mean_mape !== null ? json.summary.mean_mape + '%' : '—';
+        document.getElementById('mean-rmse').textContent = json.summary.mean_rmse ?? '—';
+        const grid = document.getElementById('metrics-grid');
+        grid.innerHTML = '';
+        Object.entries(json.by_category).forEach(([cat, m]) => {
+            const col = !m.mape ? '' : m.mape < 15 ? 'color:var(--green)' : m.mape < 35 ? 'color:var(--yellow)' : 'color:var(--red)';
+            const el  = document.createElement('div');
+            el.className = 'metric-card';
+            const modelBadge = m.model === 'LSTM' ? 'badge-green' : m.model === 'LightGBM' ? 'badge-yellow' : 'badge-red';
+            el.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+                    <div class="cat-name" title="${cat}" style="margin-bottom:0">${cat}</div>
+                    <span class="badge ${modelBadge}" style="font-size:0.6rem;padding:2px 7px;flex-shrink:0;margin-left:6px">${m.model}</span>
+                </div>
+                <div class="metric-row"><span class="mlabel">MAPE</span><span class="mval" style="${col}">${m.mape !== null ? m.mape + '%' : '—'}</span></div>
+                <div class="metric-row"><span class="mlabel">RMSE</span><span class="mval">${m.rmse !== null && m.rmse !== undefined ? m.rmse : '—'}</span></div>`;
+            grid.appendChild(el);
+        });
+        metricsLoaded = true;
     }
 </script>
 </body>
