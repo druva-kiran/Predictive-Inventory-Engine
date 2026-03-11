@@ -350,10 +350,10 @@
             <button class="tab active" id="tab-forecast"      role="tab" onclick="switchTab('forecast', this)">FORECAST</button>
             <button class="tab"        id="tab-replenishment" role="tab" onclick="switchTab('replenishment', this)">REPLENISHMENT</button>
             <button class="tab"        id="tab-metrics"       role="tab" onclick="switchTab('metrics', this)">METRICS</button>
+            <button class="tab"        id="tab-chat"          role="tab" onclick="switchTab('chat', this)">CHAT</button>
         </div>
     </div>
 
-    <!-- ════════ FORECAST ════════ -->
     <div class="panel active" id="panel-forecast">
         <div class="forecast-grid">
             <div class="card">
@@ -391,7 +391,6 @@
         </div>
     </div>
 
-    <!-- ════════ REPLENISHMENT ════════ -->
     <div class="panel" id="panel-replenishment">
         <div class="stat-row">
             <div class="stat-card"><div class="label">Orders Needed</div><div class="value warn" id="rep-orders-count">—</div></div>
@@ -408,7 +407,6 @@
                         <option value="7">Lead: 7d</option>
                     </select>
                     <button class="btn-inline" onclick="loadReplenishment()">↻ REFRESH</button>
-                    <!-- Download ORDER items only -->
                     <button class="btn-download" id="dl-btn" onclick="downloadOrders()" disabled>⬇ DOWNLOAD ORDERS</button>
                 </div>
             </div>
@@ -423,7 +421,6 @@
         </div>
     </div>
 
-    <!-- ════════ METRICS ════════ -->
     <div class="panel" id="panel-metrics">
         <div class="stat-row">
             <div class="stat-card"><div class="label">Mean MAPE</div><div class="value" id="mean-mape">—</div></div>
@@ -435,9 +432,30 @@
         </div>
     </div>
 
-</div><!-- /wrapper -->
+    <div class="panel" id="panel-chat">
+        <div class="card" style="display: flex; flex-direction: column; height: 450px;">
+            <div class="table-header">
+                <div class="card-label" style="margin-bottom:0">PIE Assistant</div>
+                <div class="status-pill">
+                    <span class="status-dot" style="background: var(--yellow)"></span>
+                    <span style="color: var(--yellow)">LLAMA 3.2:3B</span>
+                </div>
+            </div>
+            
+            <div id="chat-history" style="flex: 1; overflow-y: auto; margin: 10px 0; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); font-family: var(--sans); font-size: 0.85rem;">
+                <div style="text-align: left; margin-bottom: 12px;">
+                    <span style="background: var(--surface); border: 1px solid var(--border); padding: 8px 12px; border-radius: 12px; display: inline-block;">System ready. What do you need to know about the forecast?</span>
+                </div>
+            </div>
 
-<script>
+            <div style="display: flex; gap: 8px;">
+                <input type="text" id="chat-input" class="search-input" placeholder="Ask about categories, metrics, or logic..." onkeypress="if(event.key==='Enter') sendChat()">
+                <button class="btn-primary" style="margin-bottom: 0; width: auto; padding: 0 24px;" onclick="sendChat()" id="chat-btn">SEND</button>
+            </div>
+        </div>
+    </div>
+
+</div><script>
     let masterData   = {};
     let chart;
     let currentStore = 1;
@@ -791,6 +809,79 @@
             grid.appendChild(el);
         });
         metricsLoaded = true;
+    }
+
+    /* ── Chat ── */
+    /* ── Chat ── */
+    async function sendChat() {
+        const input = document.getElementById('chat-input');
+        const btn = document.getElementById('chat-btn');
+        const msg = input.value.trim();
+        if(!msg) return;
+        
+        input.value = '';
+        btn.disabled = true;
+        btn.textContent = '...';
+
+        const history = document.getElementById('chat-history');
+        // Add user message to UI
+        history.innerHTML += `
+            <div style="text-align: right; margin-bottom: 12px;">
+                <span style="background: var(--accent); color: var(--bg); padding: 8px 12px; border-radius: 12px; display: inline-block;">${msg}</span>
+            </div>`;
+        history.scrollTop = history.scrollHeight;
+
+        // --- CONTEXT INJECTION: Build summaries of live data to send to the LLM ---
+        let forecastSummary = "None";
+        if (Object.keys(masterData).length > 0) {
+            // Slice top 10 so we don't blow up the LLM token limit
+            const top10 = Object.entries(masterData).slice(0, 10).map(([k, v]) => `${k}: ${v}`).join(', ');
+            forecastSummary = `Top predicted categories today: ${top10}`;
+        }
+        
+        let repSummary = "None";
+        if (lastRepJson && lastRepJson.orders_needed !== undefined) {
+            // Find categories that specifically need ordering
+            const criticalItems = Object.entries(lastRepJson.replenishment)
+                .filter(([, d]) => d.action === 'ORDER')
+                .map(([cat, d]) => `${cat} (needs ${d.recommended_order})`)
+                .join(', ');
+            
+            repSummary = `Total orders needed: ${lastRepJson.orders_needed}. Lead time: ${lastRepJson.lead_time_days} days. Critical items to order: ${criticalItems || 'None'}`;
+        }
+
+        try {
+            const res = await fetch('/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    message: msg,
+                    forecast: forecastSummary,
+                    replenishment: repSummary
+                })
+            });
+            const data = await res.json();
+            
+            if(data.error) throw new Error(data.error);
+
+            // Add bot reply to UI
+            // Add bot reply to UI - converting newlines to HTML breaks
+            const formattedReply = data.reply.replace(/\n/g, '<br>');
+            history.innerHTML += `
+                <div style="text-align: left; margin-bottom: 12px; line-height: 1.5;">
+                    <span style="background: var(--surface); border: 1px solid var(--border); padding: 8px 12px; border-radius: 12px; display: inline-block;">${formattedReply}</span>
+                </div>`;
+        } catch (e) {
+            history.innerHTML += `
+                <div style="text-align: left; margin-bottom: 12px;">
+                    <span style="background: var(--red-light); color: var(--red); border: 1px solid var(--red); padding: 8px 12px; border-radius: 12px; display: inline-block;">Error: ${e.message}</span>
+                </div>`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'SEND';
+            history.scrollTop = history.scrollHeight;
+        }
+    
     }
 </script>
 </body>

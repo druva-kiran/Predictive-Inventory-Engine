@@ -16,6 +16,7 @@ import gc
 import os
 import pickle
 import traceback
+import requests
 
 import numpy as np
 import pandas as pd
@@ -39,6 +40,7 @@ app = Flask(__name__)
 
 SERVICE_LEVEL_Z = 1.65
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
 # ── Metrics cache (store_nbr → result dict) ───────────────────────────────────
 METRICS_CACHE: dict = {}
@@ -425,7 +427,6 @@ def load_store(store_nbr: int) -> bool:
 
 
 # ── Pre-warm first store at startup ───────────────────────────────────────────
-# Eliminates the cold-start delay on the very first /predict/all request.
 if AVAILABLE_STORES:
     print(f"[startup] Pre-warming store {AVAILABLE_STORES[0]} ...")
     load_store(AVAILABLE_STORES[0])
@@ -542,6 +543,47 @@ def replenishment():
     except Exception:
         return jsonify({"error": traceback.format_exc()}), 500
 
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    req_data = request.json
+    user_msg = req_data.get("message", "")
+    if not user_msg:
+        return jsonify({"error": "Empty message"}), 400
+
+    # Catch the live data sent from the frontend
+    forecast_summary = req_data.get("forecast", "No forecast data loaded yet.")
+    rep_summary = req_data.get("replenishment", "No replenishment data loaded yet.")
+
+    # Ground the model in reality so it stops hallucinating
+    # Ground the model in reality AND force it to format cleanly
+    system_prompt = (
+        "You are the AI assistant for the Predictive Inventory Engine (PIE) built by team starkopedia. "
+        "You provide short, brutal, and highly accurate answers based ONLY on the data provided below. "
+        "Do not make up numbers. "
+        "CRITICAL: Never just repeat the raw comma-separated data back to the user. "
+        "Analyze it and present it cleanly. Use line breaks and short bullet points to make it easy to read.\n\n"
+        f"--- CURRENT LIVE DATA ---\n"
+        f"Forecast Context: {forecast_summary}\n"
+        f"Replenishment Context: {rep_summary}\n"
+        f"-------------------------\n\n"
+        f"User asks: {user_msg}"
+    )
+
+    try:
+        response = requests.post(f"{OLLAMA_URL}/api/generate", json={
+            "model": "llama3.2:3b",
+            "prompt": system_prompt,
+            "stream": False
+        }, timeout=30)
+        
+        response.raise_for_status()
+        reply = response.json().get("response", "No response generated.")
+        return jsonify({"reply": reply})
+        
+    except requests.exceptions.RequestException as e:
+        print(f"[chat error] {e}")
+        return jsonify({"error": "LLM server unreachable. Is Ollama/Ngrok running?"}), 503
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
