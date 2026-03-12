@@ -438,16 +438,18 @@
                 <input type="text" id="search-input" class="search-input" placeholder="e.g. MEATS, DAIRY…" onkeyup="filterTable()">
                 <hr class="divider">
                 <div class="card-label">Scenario Engine</div>
-                <div style="display: flex; gap: 8px;">
-                    <select id="scenario-cat" class="store-select" style="max-width: 120px;">
-                        <option value="">Select Cat...</option>
-                    </select>
-                    <select id="scenario-multiplier" class="store-select" style="max-width: 100px;">
-                        <option value="1.2">+20% Promo</option>
-                        <option value="1.5">+50% Viral</option>
-                        <option value="0.7">-30% Shortage</option>
-                    </select>
-                    <button class="btn-primary" style="margin-bottom:0; width:auto; padding:0 16px;" onclick="applyScenario()">APPLY</button>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div style="display: flex; gap: 8px;">
+                        <select id="scenario-cat" class="store-select" style="flex: 1; min-width: 0; padding-left: 8px;">
+                            <option value="">Select Cat...</option>
+                        </select>
+                        <select id="scenario-multiplier" class="store-select" style="flex: 1; min-width: 0; padding-left: 8px;">
+                            <option value="1.2">+20% Promo</option>
+                            <option value="1.5">+50% Viral</option>
+                            <option value="0.7">-30% Shortage</option>
+                        </select>
+                    </div>
+                    <button class="btn-primary" style="margin-bottom:0;" onclick="applyScenario()">APPLY SCENARIO</button>
                 </div>
             </div>
             <div class="card">
