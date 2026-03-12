@@ -4,8 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0">
     <meta name="theme-color" content="#f5f4f0" id="theme-color-meta">
-    <title>Inventory Forecast</title>
+    <title>Predictive Inventory Engine</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -84,6 +86,77 @@
 
         @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse  { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse  { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes slideInDown { from { transform: translateY(-100%) translateX(-50%); opacity: 0; } to { transform: translateY(0) translateX(-50%); opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+        /* ── Toast Notification ── */
+        #toast-container {
+            position: fixed;
+            top: 40px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+        .toast {
+            background: var(--surface);
+            color: var(--text-primary);
+            border: 1px solid var(--green-border);
+            border-left: 4px solid var(--green);
+            padding: 16px 24px;
+            border-radius: var(--radius-sm);
+            box-shadow: var(--shadow-hover);
+            font-family: var(--sans);
+            font-size: 0.9rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideInDown 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+        .toast.hiding {
+            animation: fadeOut 0.3s ease forwards;
+        }
+        .toast-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--green-light);
+            color: var(--green);
+            border-radius: 50%;
+        }
+
+        /* ── Chat Typing Indicator ── */
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            padding: 12px 16px;
+            border-radius: 12px;
+            height: 36px;
+        }
+        .typing-dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
 
         header {
             display: flex; flex-direction: column; gap: 12px;
@@ -331,7 +404,7 @@
 
     <header>
         <div class="header-top">
-            <div class="header-left"><h1>Inventory Forecast</h1></div>
+            <div class="header-left"><h1>Predictive Inventory Engine</h1></div>
         </div>
         <div class="header-bottom">
             <select class="store-select" id="store-select" onchange="onStoreChange()">
@@ -363,6 +436,19 @@
                 <hr class="divider">
                 <div class="card-label">Filter</div>
                 <input type="text" id="search-input" class="search-input" placeholder="e.g. MEATS, DAIRY…" onkeyup="filterTable()">
+                <hr class="divider">
+                <div class="card-label">Scenario Engine</div>
+                <div style="display: flex; gap: 8px;">
+                    <select id="scenario-cat" class="store-select" style="max-width: 120px;">
+                        <option value="">Select Cat...</option>
+                    </select>
+                    <select id="scenario-multiplier" class="store-select" style="max-width: 100px;">
+                        <option value="1.2">+20% Promo</option>
+                        <option value="1.5">+50% Viral</option>
+                        <option value="0.7">-30% Shortage</option>
+                    </select>
+                    <button class="btn-primary" style="margin-bottom:0; width:auto; padding:0 16px;" onclick="applyScenario()">APPLY</button>
+                </div>
             </div>
             <div class="card">
                 <div class="chart-meta">
@@ -407,7 +493,8 @@
                         <option value="7">Lead: 7d</option>
                     </select>
                     <button class="btn-inline" onclick="loadReplenishment()">↻ REFRESH</button>
-                    <button class="btn-download" id="dl-btn" onclick="downloadOrders()" disabled>⬇ DOWNLOAD ORDERS</button>
+                    <button class="btn-download" id="po-btn" onclick="generatePO()" disabled>📄 GENERATE PO</button>
+                    <button class="btn-download" id="dl-btn" onclick="downloadOrders()" disabled style="background:transparent; color:var(--text-secondary); border-color:var(--border);">⬇ CSV</button>
                 </div>
             </div>
             <div class="table-scroll">
@@ -438,7 +525,7 @@
                 <div class="card-label" style="margin-bottom:0">PIE Assistant</div>
                 <div class="status-pill">
                     <span class="status-dot" style="background: var(--yellow)"></span>
-                    <span style="color: var(--yellow)">LLAMA 3.2:3B</span>
+                    <span style="color: var(--yellow)">PIE</span>
                 </div>
             </div>
             
@@ -455,7 +542,9 @@
         </div>
     </div>
 
-</div><script>
+</div>
+<div id="toast-container"></div>
+<script>
     let masterData   = {};
     let chart;
     let currentStore = 1;
@@ -521,6 +610,7 @@
         document.getElementById('mean-rmse').textContent = '—';
         document.getElementById('rep-orders-count').textContent = '—';
         document.getElementById('dl-btn').disabled = true;
+        document.getElementById('po-btn').disabled = true;
         document.getElementById('table-body').innerHTML =
             '<tr><td colspan="3"><div class="empty-state"><span class="icon">◌</span>Run inference to load predictions</div></td></tr>';
         document.getElementById('rep-table-body').innerHTML =
@@ -580,20 +670,69 @@
 
     function renderForecast() {
         const tbody  = document.getElementById('table-body');
-        tbody.innerHTML = '';
         const labels = Object.keys(masterData);
         const values = Object.values(masterData);
         const total  = values.reduce((a, b) => a + b, 0);
         document.getElementById('total-val').textContent = Math.round(total).toLocaleString();
         document.getElementById('row-count').textContent = labels.length + ' categories';
+        
+        const catSelect = document.getElementById('scenario-cat');
+        if (catSelect) {
+            let catOptions = '<option value="">Select Cat...</option>';
+            labels.forEach(cat => {
+                catOptions += `<option value="${cat}">${cat}</option>`;
+            });
+            catSelect.innerHTML = catOptions;
+        }
+        
+        let htmlBuffer = [];
         labels.forEach(cat => {
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${cat}</td>
+            htmlBuffer.push(`<tr><td>${cat}</td>
                 <td><span class="mono-val">${masterData[cat].toLocaleString()}</span></td>
-                <td><span class="badge badge-green">● High</span></td>`;
-            tbody.appendChild(tr);
+                <td><span class="badge badge-green">● High</span></td></tr>`);
         });
+        tbody.innerHTML = htmlBuffer.join('');
         buildChart(labels.slice(0, 10), values.slice(0, 10));
+    }
+
+    function applyScenario() {
+        const cat = document.getElementById('scenario-cat').value;
+        const mult = parseFloat(document.getElementById('scenario-multiplier').value);
+        
+        if (!cat) {
+            alert("Please select a category to simulate.");
+            return;
+        }
+
+        masterData[cat] = Math.round(masterData[cat] * mult);
+        
+        document.getElementById('total-val').style.color = "var(--yellow)";
+        
+        renderForecast();
+        
+        showToast(`Forecast simulated: <b>${cat}</b> adjusted by <b>${mult}x</b>.`);
+    }
+
+    function showToast(message) {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.innerHTML = `
+            <div class="toast-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>
+            <div>${message}</div>
+        `;
+        
+        container.appendChild(toast);
+        
+        // Remove after 3.5 seconds
+        setTimeout(() => {
+            toast.classList.add('hiding');
+            toast.addEventListener('animationend', () => toast.remove());
+        }, 3500);
     }
 
     function filterTable() {
@@ -701,22 +840,22 @@
         document.getElementById('rep-orders-count').textContent = json.orders_needed;
 
         const tbody = document.getElementById('rep-table-body');
-        tbody.innerHTML = '';
+        let htmlBuffer = [];
         Object.entries(json.replenishment).forEach(([cat, d]) => {
             const bc = d.action === 'ORDER' ? 'badge-red' : 'badge-green';
-            const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${cat}</td>
+            htmlBuffer.push(`<tr><td>${cat}</td>
                 <td><span class="mono-val">${d.forecast_tomorrow.toLocaleString()}</span></td>
                 <td><span class="mono-val">${d.safety_stock.toLocaleString()}</span></td>
                 <td><span class="mono-val">${d.reorder_point.toLocaleString()}</span></td>
                 <td><span class="mono-val">${d.recommended_order.toLocaleString()}</span></td>
-                <td><span class="badge ${bc}">${d.action}</span></td>`;
-            tbody.appendChild(tr);
+                <td><span class="badge ${bc}">${d.action}</span></td></tr>`);
         });
+        tbody.innerHTML = htmlBuffer.join('');
 
-        // Enable download button only when there are ORDER items
+        // Enable download buttons only when there are ORDER items
         const hasOrders = json.orders_needed > 0;
         document.getElementById('dl-btn').disabled = !hasOrders;
+        document.getElementById('po-btn').disabled = !hasOrders;
         repLoaded = true;
     }
 
@@ -761,6 +900,71 @@
         URL.revokeObjectURL(url);
     }
 
+    /* ── Generate PDF Purchase Order ── */
+    function generatePO() {
+        if (!lastRepJson) return;
+        
+        // Filter out items that explicitly require an order
+        const orders = Object.entries(lastRepJson.replenishment)
+            .filter(([, d]) => d.action === 'ORDER')
+            .map(([cat, d]) => [
+                cat, 
+                d.approx_stock.toLocaleString(), 
+                d.recommended_order.toLocaleString()
+            ]);
+
+        if (!orders.length) { 
+            showToast('No critical items need ordering right now.'); 
+            return; 
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        const store = lastRepJson.store || currentStore;
+        const dateStr = new Date().toLocaleDateString();
+        
+        // Document Header
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(22);
+        doc.setTextColor(40, 40, 40);
+        doc.text("PURCHASE ORDER", 14, 22);
+        
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Generated by: Predictive Inventory Engine (PIE)`, 14, 30);
+        doc.text(`Date: ${dateStr}`, 14, 36);
+        doc.text(`Destination: Store #${store}`, 14, 42);
+        doc.text(`Target Lead Time: ${lastRepJson.lead_time_days || 3} Days`, 14, 48);
+
+        // Generate stylized exact table
+        doc.autoTable({
+            startY: 58,
+            head: [['Item Category', 'Current Approx. Stock', 'Order Quantity Required']],
+            body: orders,
+            theme: 'grid',
+            headStyles: { fillColor: [45, 106, 79], textColor: 255, fontStyle: 'bold' }, // Brand green
+            alternateRowStyles: { fillColor: [247, 246, 242] },
+            styles: { font: 'helvetica', fontSize: 10, cellPadding: 6 },
+            margin: { top: 10, left: 14, right: 14 }
+        });
+
+        // Summary Line at bottom
+        const finalY = doc.lastAutoTable.finalY || 60;
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(40, 40, 40);
+        doc.text(`Total Categories Ordering: ${orders.length}`, 14, finalY + 12);
+        
+        const totalUnits = orders.reduce((sum, row) => sum + parseInt(row[2].replace(/,/g, '')), 0);
+        doc.text(`Total Units Required: ${totalUnits.toLocaleString()}`, 14, finalY + 18);
+        
+        // Save and Toast
+        const filename = `PO_Store${store}_${new Date().toISOString().slice(0, 10)}.pdf`;
+        doc.save(filename);
+        showToast(`Purchase Order Generated: <b>${filename}</b>`);
+    }
+
     /* ── Metrics ── */
     async function loadMetrics() {
         // Show elapsed timer so users know it's working (first load can take ~30–60s)
@@ -793,21 +997,20 @@
             json.summary.mean_mape !== null ? json.summary.mean_mape + '%' : '—';
         document.getElementById('mean-rmse').textContent = json.summary.mean_rmse ?? '—';
         const grid = document.getElementById('metrics-grid');
-        grid.innerHTML = '';
+        let htmlBuffer = [];
         Object.entries(json.by_category).forEach(([cat, m]) => {
             const col = !m.mape ? '' : m.mape < 15 ? 'color:var(--green)' : m.mape < 35 ? 'color:var(--yellow)' : 'color:var(--red)';
-            const el  = document.createElement('div');
-            el.className = 'metric-card';
             const modelBadge = m.model === 'LSTM' ? 'badge-green' : m.model === 'LightGBM' ? 'badge-yellow' : 'badge-red';
-            el.innerHTML = `
+            htmlBuffer.push(`<div class="metric-card">
                 <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
                     <div class="cat-name" title="${cat}" style="margin-bottom:0">${cat}</div>
                     <span class="badge ${modelBadge}" style="font-size:0.6rem;padding:2px 7px;flex-shrink:0;margin-left:6px">${m.model}</span>
                 </div>
                 <div class="metric-row"><span class="mlabel">MAPE</span><span class="mval" style="${col}">${m.mape !== null ? m.mape + '%' : '—'}</span></div>
-                <div class="metric-row"><span class="mlabel">RMSE</span><span class="mval">${m.rmse !== null && m.rmse !== undefined ? m.rmse : '—'}</span></div>`;
-            grid.appendChild(el);
+                <div class="metric-row"><span class="mlabel">RMSE</span><span class="mval">${m.rmse !== null && m.rmse !== undefined ? m.rmse : '—'}</span></div>
+            </div>`);
         });
+        grid.innerHTML = htmlBuffer.join('');
         metricsLoaded = true;
     }
 
@@ -821,7 +1024,6 @@
         
         input.value = '';
         btn.disabled = true;
-        btn.textContent = '...';
 
         const history = document.getElementById('chat-history');
         // Add user message to UI
@@ -829,6 +1031,18 @@
             <div style="text-align: right; margin-bottom: 12px;">
                 <span style="background: var(--accent); color: var(--bg); padding: 8px 12px; border-radius: 12px; display: inline-block;">${msg}</span>
             </div>`;
+            
+        // Add the professional typing indicator bubble
+        const typingId = 'typing-' + Date.now();
+        history.innerHTML += `
+            <div id="${typingId}" style="text-align: left; margin-bottom: 12px;">
+                <div class="typing-indicator">
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                    <span class="typing-dot"></span>
+                </div>
+            </div>`;
+            
         history.scrollTop = history.scrollHeight;
 
         // --- CONTEXT INJECTION: Build summaries of live data to send to the LLM ---
@@ -864,7 +1078,10 @@
             
             if(data.error) throw new Error(data.error);
 
-            // Add bot reply to UI
+            // Remove typing indicator
+            const typingElem = document.getElementById(typingId);
+            if(typingElem) typingElem.remove();
+
             // Add bot reply to UI - converting newlines to HTML breaks
             const formattedReply = data.reply.replace(/\n/g, '<br>');
             history.innerHTML += `
@@ -872,13 +1089,16 @@
                     <span style="background: var(--surface); border: 1px solid var(--border); padding: 8px 12px; border-radius: 12px; display: inline-block;">${formattedReply}</span>
                 </div>`;
         } catch (e) {
+            // Remove typing indicator on error too
+            const typingElem = document.getElementById(typingId);
+            if(typingElem) typingElem.remove();
+            
             history.innerHTML += `
                 <div style="text-align: left; margin-bottom: 12px;">
                     <span style="background: var(--red-light); color: var(--red); border: 1px solid var(--red); padding: 8px 12px; border-radius: 12px; display: inline-block;">Error: ${e.message}</span>
                 </div>`;
         } finally {
             btn.disabled = false;
-            btn.textContent = 'SEND';
             history.scrollTop = history.scrollHeight;
         }
     

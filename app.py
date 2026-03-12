@@ -46,6 +46,10 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 METRICS_CACHE: dict = {}
 
 
+# ── Chat history (in-memory) ──────────────────────────────────────────────────
+CHAT_HISTORY: list = []
+
+
 # ── Memory helpers ────────────────────────────────────────────────────────────
 
 def rss_mb() -> float:
@@ -555,35 +559,54 @@ def chat():
     forecast_summary = req_data.get("forecast", "No forecast data loaded yet.")
     rep_summary = req_data.get("replenishment", "No replenishment data loaded yet.")
 
-    # Ground the model in reality so it stops hallucinating
-    # Ground the model in reality AND force it to format cleanly
+    # Ground the model in reality AND force it to act naturally
     system_prompt = (
-        "You are the AI assistant for the Predictive Inventory Engine (PIE) built by team starkopedia. "
-        "You provide short, brutal, and highly accurate answers based ONLY on the data provided below. "
-        "Do not make up numbers. "
-        "CRITICAL: Never just repeat the raw comma-separated data back to the user. "
-        "Analyze it and present it cleanly. Use line breaks and short bullet points to make it easy to read.\n\n"
-        f"--- CURRENT LIVE DATA ---\n"
-        f"Forecast Context: {forecast_summary}\n"
-        f"Replenishment Context: {rep_summary}\n"
-        f"-------------------------\n\n"
-        f"User asks: {user_msg}"
+        "You are the intelligent assistant for the Predictive Inventory Engine (PIE). "
+        "Your job is to answer user questions clearly. "
+        "You must maintain a highly professional, polite tone at all times. "
+        "Keep your responses to a medium length—not too brief, but do not overwhelm the user with massive blocks of text. "
+        "If the user asks for definitions, has a normal conversation, or says thank you, respond naturally as a helpful assistant. "
+        "Do NOT output raw data or forecasts unless the user explicitly asks a question about the inventory data or metrics."
     )
 
+    # Initialize history with system prompt if empty
+    if not CHAT_HISTORY:
+        CHAT_HISTORY.append({"role": "system", "content": system_prompt})
+
+    # Append live context to the user's current message so the LLM has it immediately available
+    # but don't pollute the actual displayed message history
+    enriched_user_msg = (
+        f"{user_msg}\n\n"
+        f"--- BACKGROUND LIVE DATA (USE ONLY IF RELEVANT TO MY QUESTION) ---\n"
+        f"Forecast: {forecast_summary}\n"
+        f"Replenishment: {rep_summary}\n"
+        f"-------------------------"
+    )
+
+    # Add the user's new message to history
+    CHAT_HISTORY.append({"role": "user", "content": enriched_user_msg})
+
     try:
-        response = requests.post(f"{OLLAMA_URL}/api/generate", json={
+        # Use api/chat instead of api/generate to support the messages array
+        response = requests.post(f"{OLLAMA_URL}/api/chat", json={
             "model": "llama3.2:3b",
-            "prompt": system_prompt,
+            "messages": CHAT_HISTORY,
             "stream": False
         }, timeout=30)
         
         response.raise_for_status()
-        reply = response.json().get("response", "No response generated.")
+        
+        # Parse Chat API response format
+        reply = response.json().get("message", {}).get("content", "No response generated.")
+        
+        # Append assistant reply to history for future context
+        CHAT_HISTORY.append({"role": "assistant", "content": reply})
+        
         return jsonify({"reply": reply})
         
     except requests.exceptions.RequestException as e:
         print(f"[chat error] {e}")
-        return jsonify({"error": "LLM server unreachable. Is Ollama/Ngrok running?"}), 503
+        return jsonify({"error": "LLM server unreachable. Is PIE/Ngrok running?"}), 503
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
