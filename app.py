@@ -182,22 +182,23 @@ def compute_metrics_on_demand(cache: dict) -> dict:
         target_indices = cache["lstm_target_indices"]
         scaled = scaler.transform(df[all_cols].values).astype(np.float32)
         n      = len(scaled)
-        X, y = [], []
-        for i in range(n - window_size):
-            X.append(scaled[i: i + window_size])
-            y.append(scaled[i + window_size, target_indices])
-        X        = torch.tensor(np.array(X, dtype=np.float32), dtype=torch.float32)
-        y_scaled = np.array(y, dtype=np.float32)
+        total_samples = n - window_size
+        split = int(total_samples * 0.8)
+        X_test, y_test = [], []
+        for i in range(split, total_samples):
+            X_test.append(scaled[i: i + window_size])
+            y_test.append(scaled[i + window_size, target_indices])
+        X_test = torch.tensor(np.array(X_test, dtype=np.float32), dtype=torch.float32).to(device)
+        y_test = np.array(y_test, dtype=np.float32)
         del scaled
-        gc.collect()
-        split  = int(len(X) * 0.8)
-        X_test = X[split:].to(device)
-        y_test = y_scaled[split:]
-        del X, y_scaled
         gc.collect()
         cache["lstm_model"].eval()
         with torch.no_grad():
-            y_pred_scaled = cache["lstm_model"](X_test).cpu().numpy()
+            batch_sz = 64
+            y_preds = []
+            for b_idx in range(0, len(X_test), batch_sz):
+                y_preds.append(cache["lstm_model"](X_test[b_idx:b_idx+batch_sz]).cpu().numpy())
+            y_pred_scaled = np.concatenate(y_preds, axis=0) if y_preds else np.array([])
         del X_test
         gc.collect()
 
